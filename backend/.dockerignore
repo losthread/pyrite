@@ -75,6 +75,10 @@ target/
 .venv/
 venv/
 
+# SQLite
+*.db
+*.sqlite3
+
 # PyCharm
 .idea
 
