@@ -1,0 +1,103 @@
+<!--
+  ==============================================================================
+  VYUH (CHAKRAVYUH) // CUSTOM WAZUH DECEPTION & SEGREGATION RULES
+  D3COY 1.0 — Problem Statement 04: Deception-Driven Threat Detection & Response
+  ==============================================================================
+  Ingests structured JSON telemetry from /backend/logs/vyuh_deception.json.
+  Segregates noise (Level 5) vs breach (Level 10-12) vs critical exfil (Level 15).
+  Provides dual MITRE ATT&CK (Red) and MITRE Engage (Blue) tagging.
+-->
+
+<group name="vyuh_deception,honeypot,active_defense,">
+
+  <!-- ========================================================================
+       Rule 100500: Base Root Deception Event (Level 3)
+       ======================================================================== -->
+  <rule id="100500" level="3">
+    <decoded_as>json</decoded_as>
+    <field name="vyuh_event">true</field>
+    <description>VYUH Active Deception telemetry event captured from honeypot network</description>
+    <group>deception_telemetry,</group>
+  </rule>
+
+  <!-- ========================================================================
+       Rule 100501: Stage 1 Recon Leak & Breadcrumb Harvested (Level 5)
+       ======================================================================== -->
+  <rule id="100501" level="5">
+    <if_sid>100500</if_sid>
+    <field name="stage">1</field>
+    <description>VYUH [Stage 1 - Recon]: Adversary discovered exposed reflog/env leak and harvested Crumb #1</description>
+    <mitre>
+      <id>T1592</id>
+    </mitre>
+    <group>reconnaissance,breadcrumb_leak,</group>
+  </rule>
+
+  <!-- ========================================================================
+       Rule 100502: Stage 2a Database Syntax Error Probe (Level 7)
+       ======================================================================== -->
+  <rule id="100502" level="7">
+    <if_sid>100500</if_sid>
+    <field name="stage">2</field>
+    <field name="action.title">Stage 2 SQLi Syntax Error Triggered (Ego Boost)</field>
+    <description>VYUH [Stage 2a - Probe]: Adversary tested unescaped SQL syntax single quote; returned ego-boost error</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>sql_injection,probe,</group>
+  </rule>
+
+  <!-- ========================================================================
+       Rule 100503: Stage 2b HoneyPatch SQLi Exploit & Session Fork (Level 10)
+       ======================================================================== -->
+  <rule id="100503" level="10">
+    <if_sid>100500</if_sid>
+    <field name="stage">2</field>
+    <field name="action.title">Stage 2 HoneyPatch Session Fork Triggered</field>
+    <description>VYUH [Stage 2b - HoneyPatch]: SQLi exploit detected; triggered Session Fork leaking fake devops credentials (Crumb #2)</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+    <group>exploit_attempt,honeypatch,privilege_escalation,</group>
+  </rule>
+
+  <!-- ========================================================================
+       Rule 100504: Stage 3 Cowrie-Style Virtual Shell Execution (Level 12)
+       ======================================================================== -->
+  <rule id="100504" level="12">
+    <if_sid>100500</if_sid>
+    <field name="stage">3</field>
+    <description>VYUH [Stage 3 - Shell]: Interactive Linux shell command executed inside isolated jumpbox shadow world</description>
+    <mitre>
+      <id>T1059.004</id>
+    </mitre>
+    <group>command_execution,shadow_world,jumpbox,</group>
+  </rule>
+
+  <!-- ========================================================================
+       Rule 100505: Stage 4 Cold Vault Exfiltration & Adaptive Tarpit (Level 15 - CRITICAL)
+       ======================================================================== -->
+  <rule id="100505" level="15">
+    <if_sid>100500</if_sid>
+    <field name="stage">4</field>
+    <description>VYUH [Stage 4 - CRITICAL]: Cold Storage Vault exfiltration initiated with stolen master key; adaptive tarpit engaged</description>
+    <mitre>
+      <id>T1041</id>
+    </mitre>
+    <group>data_exfiltration,critical_breach,tarpit,</group>
+  </rule>
+
+  <!-- ========================================================================
+       Rule 100506: Syndicate Collusion & Burned Token Tripwire (Level 14 - HIGH)
+       ======================================================================== -->
+  <rule id="100506" level="14">
+    <if_sid>100500</if_sid>
+    <field name="attacker.tokenShared">true</field>
+    <description>VYUH [ANOMALY - COLLUSION]: Token shared across multiple distinct JA4H clients; lateral syndicate collusion detected</description>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
+    <group>syndicate_collusion,lateral_movement,identity_anomaly,</group>
+  </rule>
+
+</group>

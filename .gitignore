@@ -43,9 +43,11 @@ node_modules/
 venv/
 
 
-# DB
+# DB & State
 *.db
 *.sqlite3
+backend/logs/*.json
+attacker-cli/.attacker_state.json
 
 
 # Distribution / packaging
