@@ -3,6 +3,11 @@ FROM node:22-alpine
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Inline the backend base URL at build time so the SOC dashboard live mode
+# reaches the FastAPI backend published on port 8003.
+ARG NEXT_PUBLIC_API_URL=http://localhost:8003
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
