@@ -372,14 +372,16 @@ async def handle_stage_3(request: Request):
         command = request.query_params.get("cmd", "").strip()
 
     verify_res = verify_crumb(token, ja4h, seed_id)
-    if not verify_res["valid"] and not token.startswith("vk_live_"):
+    if not verify_res["valid"] or verify_res.get("expired"):
         return JSONResponse(
             status_code=401,
             content={
                 "stdout": "",
                 "stderr": "Permission denied (publickey,gssapi-keyex,gssapi-with-mic).\n",
-                "exitCode": 255
-            }
+                "exitCode": 255,
+                "error": "AUTH_REJECTED",
+                "reason": verify_res.get("reason", "INVALID_TOKEN"),
+            },
         )
 
     session["highest_stage"] = max(session["highest_stage"], 3)
@@ -445,15 +447,16 @@ async def handle_stage_4(request: Request):
         vault_key = request.query_params.get("key") or request.query_params.get("token")
 
     verify_res = verify_crumb(vault_key, ja4h, seed_id)
-    if not verify_res["valid"] and not str(vault_key).startswith("vk_live_"):
+    if not verify_res["valid"] or verify_res.get("expired"):
         return JSONResponse(
             status_code=403,
             content={
-                "error": "VAULT_ACCESS_DENIED",
+                "error": "AUTH_REJECTED",
                 "status": 403,
-                "message": "Invalid or missing master KMS key authorization.",
-                "hint": "Expected X-Vault-Key header"
-            }
+                "message": "Invalid, expired, or missing master KMS key authorization.",
+                "reason": verify_res.get("reason", "INVALID_TOKEN"),
+                "hint": "Expected X-Vault-Key header",
+            },
         )
 
     session["highest_stage"] = 4

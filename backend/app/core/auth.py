@@ -39,7 +39,7 @@ def create_jwt_token(user_id: str) -> str:
 
     payload: dict = {
         "user_id": str(user_id),
-        "exp": datetime.now(timezone.utc) + timedelta(days=7)
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=60)
     }
 
     # return final JWT string
