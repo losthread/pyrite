@@ -1,17 +1,26 @@
-import { Geist, Geist_Mono, Inter, DM_Sans } from "next/font/google"
+import type { Metadata, Viewport } from "next"
 
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
-import { cn } from "@/lib/utils";
 
-const dmSansHeading = DM_Sans({subsets:['latin'],variable:'--font-heading'});
+export const metadata: Metadata = {
+  title: "VYUHA (Chakravyuha) — Easy to Breach. Impossible to Escape.",
+  description:
+    "An ephemeral, self-mutating 4-stage deception labyrinth that weaponizes attacker greed, tracks cross-IP syndicate collusion via stateless HMAC breadcrumbs, and segregates threats through Wazuh SIEM rules.",
+  keywords: [
+    "active deception",
+    "honeypot",
+    "Wazuh",
+    "MITRE Engage",
+    "cybersecurity",
+    "VYUHA",
+    "Chakravyuha",
+  ],
+}
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'})
-
-const fontMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-})
+export const viewport: Viewport = {
+  themeColor: "#0A0A09",
+  colorScheme: "dark",
+}
 
 export default function RootLayout({
   children,
@@ -19,14 +28,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, dmSansHeading.variable)}
-    >
-      <body>
-        <ThemeProvider>{children}</ThemeProvider>
-      </body>
+    <html lang="en" suppressHydrationWarning className="antialiased">
+      <body>{children}</body>
     </html>
   )
 }
