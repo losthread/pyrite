@@ -17,12 +17,17 @@ from typing import Any, Dict, Optional
 import httpx
 
 INDEXER_URL = os.getenv("WAZUH_INDEXER_URL", "https://10.46.34.107:9200").rstrip("/")
-WAZUH_USER = os.getenv("WAZUH_USER", "admin")
-WAZUH_PASS = os.getenv("WAZUH_PASS", "admin")
+WAZUH_USER = os.getenv("WAZUH_USERNAME") or os.getenv("WAZUH_USER") or "admin"
+WAZUH_PASS = os.getenv("WAZUH_PASSWORD") or os.getenv("WAZUH_PASS") or "admin"
 WAZUH_VERIFY = os.getenv("WAZUH_VERIFY", "false").lower() in {"1", "true", "yes"}
 INDEX_PATTERN = os.getenv("WAZUH_INDEX_PATTERN", "wazuh-alerts-*")
-VYUH_INDEX = "vyuh-alerts"
-TIMEOUT_SECONDS = 1.5
+VYUH_INDEX = os.getenv("WAZUH_VYUH_INDEX", "vyuh-alerts")
+TIMEOUT_SECONDS = float(os.getenv("WAZUH_TIMEOUT_SECONDS", "1.5"))
+ROUNDTRIP_ENABLED = os.getenv("WAZUH_ROUNDTRIP_ENABLED", "true").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 def _client() -> httpx.Client:
@@ -35,9 +40,19 @@ def _client() -> httpx.Client:
 
 def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
     """Build a Wazuh-indexable document from a VYUH deception event."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
+    raw_ts = event.get("timestamp")
+    if isinstance(raw_ts, str) and raw_ts and "T" not in raw_ts and ":" in raw_ts:
+        # Emit path produces "HH:MM:SS.mmm"; expand to a full UTC ISO timestamp
+        # so OpenSearch date mapping accepts it without rejecting the document.
+        timestamp = f"{now.date().isoformat()}T{raw_ts}Z"
+    elif raw_ts:
+        timestamp = raw_ts
+    else:
+        timestamp = now.isoformat()
+
     doc: Dict[str, Any] = {
-        "@timestamp": event.get("timestamp") or now,
+        "@timestamp": timestamp,
         "vyuh_event": True,
         "event": {
             "id": event.get("eventId"),
@@ -96,6 +111,14 @@ def query_alerts(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 def roundtrip(event: Dict[str, Any]) -> Dict[str, Any]:
     """Forward an event then query it back for SOC verification."""
+    if not ROUNDTRIP_ENABLED:
+        return {
+            "wazuh_verified": False,
+            "wazuh_node": INDEXER_URL,
+            "wazuh_fallback": True,
+            "wazuh_forward_status": "disabled",
+        }
+
     forwarded = forward_event(event)
     alert = query_alerts(event) if forwarded.get("forwarded") else None
     verified = bool(alert) and forwarded.get("forwarded", False)

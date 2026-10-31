@@ -401,7 +401,9 @@ async def handle_stage_3(request: Request):
     update_threat_score(ja4h, 20)
     dwell = int(time.time() - session["created_at"])
 
-    result = execute_virtual_shell(command, session, ja4h)
+    # Run the shell engine in a worker thread: the fast-path stays sub-2ms, and
+    # the DeepSeek LLM kernel can take seconds without blocking the event loop.
+    result = await asyncio.to_thread(execute_virtual_shell, command, session, ja4h)
 
     # Broadcast terminal stream to SOC
     await ws_manager.broadcast("terminal_stream", {

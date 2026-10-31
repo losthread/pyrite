@@ -19,8 +19,9 @@ from typing import Any, Dict, List, Optional
 import requests
 
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
+DEEPSEEK_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/v1/chat/completions"
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_TIMEOUT = float(os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "15"))
 
 # Same SQLite file as the SOC engine so virtual files survive a session restart.
 _BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -135,15 +136,16 @@ def _deepseek_call(command: str, context: str) -> Optional[Dict[str, Any]]:
             json={
                 "model": DEEPSEEK_MODEL,
                 "temperature": 0.4,
+                "response_format": {"type": "json_object"},
                 "messages": [
                     {"role": "system", "content": _SYSTEM_PROMPT},
                     {
                         "role": "user",
-                        "content": f"Context: {context}\nCommand: {command}",
+                        "content": f"Context: {context}\nCommand: {command}\nRespond with JSON only.",
                     },
                 ],
             },
-            timeout=2.0,
+            timeout=DEEPSEEK_TIMEOUT,
         )
         if response.status_code != 200:
             return None
