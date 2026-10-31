@@ -40,4 +40,8 @@ Legend: `[ ]` PENDING · `[~]` IN_PROGRESS · `[x]` COMPLETED
 - Next Immediate Action: Module 5 (CLI verification suite)
 
 ## Module 5 — CLI Verification & Resume Script (attack_sim.py)
-- [ ] PENDING
+- [x] Add Option [8] Mentor Critique Verification Suite (LLM + anti-docker + round-trip)
+- [x] Shift topology rotation to Option [9]; update prompt/dispatch
+- [x] Expose `wazuhNode` on `/api/status`
+- Files: attacker-cli/attack_sim.py, backend/app/stages/routes.py
+- Next Immediate Action: none (all modules complete)

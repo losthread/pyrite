@@ -566,6 +566,7 @@ async def get_system_status():
         "persona": topology["persona"],
         "activeSessions": len(get_all_shadow_worlds()),
         "prodCorrelationCount": len(prod_auth_logs),
+        "wazuhNode": os.getenv("WAZUH_INDEXER_URL", "https://10.46.34.107:9200"),
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     }
 
