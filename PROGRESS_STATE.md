@@ -32,7 +32,12 @@ Legend: `[ ]` PENDING · `[~]` IN_PROGRESS · `[x]` COMPLETED
 - Next Immediate Action: Module 4 (anti-docker cloak + noise + Endlessh)
 
 ## Module 4 — Anti-Docker Cloaking, Living Noise, Endlessh Tarpit
-- [ ] PENDING
+- [x] Anti-container probes (dockerenv, cgroup, df/mount, sched, DMI, dmidecode)
+- [x] Remove `docker` group from `id`; spoof ping/traceroute C2 IOC
+- [x] Living corporate noise: dynamic ps/w/who/netstat/auth.log + Envoy jitter
+- [x] `ENGAGE_ENDLESSH_TARPIT` 1 byte / 10s action in `intelligence.py`
+- Files: stages/virtual_shell.py, core/intelligence.py, main.py (jitter header)
+- Next Immediate Action: Module 5 (CLI verification suite)
 
 ## Module 5 — CLI Verification & Resume Script (attack_sim.py)
 - [ ] PENDING
