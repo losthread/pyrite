@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import time
 from typing import Any, Dict, List, Optional
@@ -19,8 +20,12 @@ from typing import Any, Dict, List, Optional
 import requests
 
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-DEEPSEEK_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/v1/chat/completions"
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+_base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
+if _base_url.endswith("/v1"):
+    DEEPSEEK_URL = _base_url + "/chat/completions"
+else:
+    DEEPSEEK_URL = _base_url + "/v1/chat/completions"
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4.1-flash:free")
 DEEPSEEK_TIMEOUT = float(os.getenv("DEEPSEEK_TIMEOUT_SECONDS", "15"))
 
 # Same SQLite file as the SOC engine so virtual files survive a session restart.
@@ -148,11 +153,24 @@ def _deepseek_call(command: str, context: str) -> Optional[Dict[str, Any]]:
             timeout=DEEPSEEK_TIMEOUT,
         )
         if response.status_code != 200:
+            print(f"[!] [LLM] DeepSeek {response.status_code}: {response.text[:160]}")
             return None
         content = response.json()["choices"][0]["message"]["content"].strip()
         content = content.strip("```json").strip("```").strip()
-        return json.loads(content)
-    except Exception:  # noqa: BLE001
+        try:
+            return json.loads(content)
+        except Exception:
+            # Some gateways append prose around the JSON object; recover the
+            # first balanced {...} block instead of failing.
+            match = re.search(r"\{.*\}", content, re.S)
+            if not match:
+                return None
+            try:
+                return json.loads(match.group(0))
+            except Exception:  # noqa: BLE001
+                return None
+    except Exception as exc:  # noqa: BLE001
+        print(f"[!] [LLM] DeepSeek request failed: {type(exc).__name__}: {str(exc)[:160]}")
         return None
 
 
