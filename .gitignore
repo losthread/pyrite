@@ -46,6 +46,7 @@ venv/
 # DB
 *.db
 *.sqlite3
+backend/logs/*.json
 
 
 # Distribution / packaging
