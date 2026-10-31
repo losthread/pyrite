@@ -39,6 +39,9 @@ pydantic-settings==2.16.2
 pydantic_core==2.50.2
 Pygments==2.21.0
 python-dotenv==1.2.4
+PyJWT
+argon2-cffi
+google-auth
 python-multipart==0.0.32
 PyYAML==6.0.3
 requests==2.34.2
