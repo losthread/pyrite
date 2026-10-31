@@ -5,8 +5,18 @@ Enables Cross-IP Threat Attribution (tracking adversaries hopping VPNs/proxies).
 """
 
 import hashlib
+import os
 from typing import Dict, Any
 from fastapi import Request
+
+# Demo-safe default: the simulation override is enabled so attack_sim.py can
+# demonstrate syndicate collusion. In production set VYUH_ALLOW_SIM_OVERRIDE=false
+# so adversaries cannot choose their own fingerprint.
+ALLOW_SIM_OVERRIDE = os.getenv("VYUH_ALLOW_SIM_OVERRIDE", "true").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 def extract_client_identity(request: Request) -> Dict[str, Any]:
@@ -57,7 +67,9 @@ def extract_client_identity(request: Request) -> Dict[str, Any]:
     header_order_sig = ",".join(raw_header_keys[:10])
 
     # 6. Override header for syndicate / machine switch demo
-    test_override = request.headers.get("x-client-fingerprint")
+    test_override = (
+        request.headers.get("x-client-fingerprint") if ALLOW_SIM_OVERRIDE else None
+    )
     is_override = bool(test_override)
 
     if is_override:

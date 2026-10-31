@@ -28,7 +28,7 @@ from app.core.shadow_world import (
     engage_tarpit_speed,
     get_shadow_world
 )
-from app.core.wazuh_bridge import evaluate_wazuh_rule, write_deception_log
+from app.core.wazuh_bridge import evaluate_wazuh_rule, write_deception_log, roundtrip_to_wazuh
 from app.core.intelligence import (
     persist_telemetry_event,
     ws_manager,
@@ -55,7 +55,8 @@ async def emit_telemetry_event(
     crumb_used: Optional[str],
     threat_score: int,
     dwell_time_seconds: int,
-    polymorphic_seed: str
+    polymorphic_seed: str,
+    zero_day_eval: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Helper to evaluate Wazuh rule, persist to SQLite, log to file, and broadcast over WebSocket."""
     raw_event = {
@@ -84,6 +85,9 @@ async def emit_telemetry_event(
         }
     }
 
+    if zero_day_eval:
+        raw_event["zero_day_eval"] = zero_day_eval
+
     # Evaluate Wazuh Rule
     wazuh_eval = evaluate_wazuh_rule(raw_event)
     raw_event["wazuh"] = wazuh_eval
@@ -95,7 +99,16 @@ async def emit_telemetry_event(
     # 1. Write structured single-line JSON log for Wazuh
     write_deception_log(raw_event)
 
-    # 2. Persist to SQLite
+    # 2. Round-trip to the live Wazuh Indexer (forward + query back) with a
+    #    graceful local fallback when the venue network is unavailable.
+    wazuh_roundtrip = await asyncio.to_thread(roundtrip_to_wazuh, raw_event)
+    raw_event["wazuh"]["wazuh_verified"] = wazuh_roundtrip.get("wazuh_verified", False)
+    raw_event["wazuh"]["wazuh_node"] = wazuh_roundtrip.get("wazuh_node")
+    raw_event["wazuh"]["wazuh_fallback"] = wazuh_roundtrip.get("wazuh_fallback", True)
+    if wazuh_roundtrip.get("wazuh_alert"):
+        raw_event["wazuh"]["wazuh_alert"] = wazuh_roundtrip["wazuh_alert"]
+
+    # 3. Persist to SQLite
     persist_telemetry_event(raw_event)
 
     # 3. Broadcast to all connected SOC analysts over WebSocket
@@ -372,21 +385,25 @@ async def handle_stage_3(request: Request):
         command = request.query_params.get("cmd", "").strip()
 
     verify_res = verify_crumb(token, ja4h, seed_id)
-    if not verify_res["valid"] and not token.startswith("vk_live_"):
+    if not verify_res["valid"] or verify_res.get("expired"):
         return JSONResponse(
             status_code=401,
             content={
                 "stdout": "",
                 "stderr": "Permission denied (publickey,gssapi-keyex,gssapi-with-mic).\n",
-                "exitCode": 255
-            }
+                "exitCode": 255,
+                "error": "AUTH_REJECTED",
+                "reason": verify_res.get("reason", "INVALID_TOKEN"),
+            },
         )
 
     session["highest_stage"] = max(session["highest_stage"], 3)
     update_threat_score(ja4h, 20)
     dwell = int(time.time() - session["created_at"])
 
-    result = execute_virtual_shell(command, session, ja4h)
+    # Run the shell engine in a worker thread: the fast-path stays sub-2ms, and
+    # the DeepSeek LLM kernel can take seconds without blocking the event loop.
+    result = await asyncio.to_thread(execute_virtual_shell, command, session, ja4h)
 
     # Broadcast terminal stream to SOC
     await ws_manager.broadcast("terminal_stream", {
@@ -415,7 +432,8 @@ async def handle_stage_3(request: Request):
         crumb_used=token,
         threat_score=max(session["threat_score"], 85),
         dwell_time_seconds=dwell,
-        polymorphic_seed=seed_id
+        polymorphic_seed=seed_id,
+        zero_day_eval=result.get("zero_day_eval")
     )
 
     return JSONResponse(status_code=200, content=result)
@@ -445,15 +463,16 @@ async def handle_stage_4(request: Request):
         vault_key = request.query_params.get("key") or request.query_params.get("token")
 
     verify_res = verify_crumb(vault_key, ja4h, seed_id)
-    if not verify_res["valid"] and not str(vault_key).startswith("vk_live_"):
+    if not verify_res["valid"] or verify_res.get("expired"):
         return JSONResponse(
             status_code=403,
             content={
-                "error": "VAULT_ACCESS_DENIED",
+                "error": "AUTH_REJECTED",
                 "status": 403,
-                "message": "Invalid or missing master KMS key authorization.",
-                "hint": "Expected X-Vault-Key header"
-            }
+                "message": "Invalid, expired, or missing master KMS key authorization.",
+                "reason": verify_res.get("reason", "INVALID_TOKEN"),
+                "hint": "Expected X-Vault-Key header",
+            },
         )
 
     session["highest_stage"] = 4
@@ -549,6 +568,7 @@ async def get_system_status():
         "persona": topology["persona"],
         "activeSessions": len(get_all_shadow_worlds()),
         "prodCorrelationCount": len(prod_auth_logs),
+        "wazuhNode": os.getenv("WAZUH_INDEXER_URL", "https://10.46.34.107:9200"),
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     }
 

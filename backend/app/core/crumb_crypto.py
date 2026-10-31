@@ -11,12 +11,23 @@ import hmac
 import hashlib
 import json
 import base64
+import secrets
 import time
 import os
 import re
 from typing import Dict, Any, Optional
 
-HMAC_SECRET = os.getenv("VYUH_CRUMB_SECRET", "vyuh_chakravyuh_master_hmac_secret_2026").encode("utf-8")
+# Never fall back to a hardcoded secret. If the operator does not configure
+# VYUH_CRUMB_SECRET, generate a fresh ephemeral key at process startup so that
+# forged tokens from a previous run cannot be replayed. A warning is emitted so
+# operators know tokens will not survive a restart.
+_env_secret = os.getenv("VYUH_CRUMB_SECRET")
+if _env_secret and len(_env_secret) >= 32:
+    HMAC_SECRET = _env_secret.encode("utf-8")
+else:
+    HMAC_SECRET = secrets.token_bytes(32)
+    print("[!] [CRUMB CRYPTO] VYUH_CRUMB_SECRET missing or short; using an ephemeral random key.")
+
 TOKEN_MAX_AGE_SECONDS = 900  # 15 minutes TTL
 
 

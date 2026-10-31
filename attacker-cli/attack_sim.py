@@ -142,7 +142,8 @@ def render_menu():
     {YELLOW}[5]{RESET} Simulate IP Switch / VPN Hop {DIM}(Same JA4H, New IP -> Tests Cross-IP Attribution){RESET}
     {MAGENTA}[6]{RESET} Simulate Hacker Syndicate Collusion {DIM}(Pass Stolen Key to Hacker B -> New JA4H Alert){RESET}
     {RED}[7]{RESET} Replay Old Token After Topology Mutation {DIM}(Triggers Burned Token Tripwire!){RESET}
-    {BLUE}[8]{RESET} Rotate Polymorphic Topology Seed {DIM}(Morph-v1.0 <-> Morph-v2.0){RESET}
+    {BLUE}[8]{RESET} Mentor Critique Verification Suite {DIM}(LLM Zero-Day + Anti-Docker + Wazuh Round-Trip){RESET}
+    {BLUE}[9]{RESET} Rotate Polymorphic Topology Seed {DIM}(Morph-v1.0 <-> Morph-v2.0){RESET}
 
     {DIM}[0] Exit Demo{RESET}
 """)
@@ -379,13 +380,62 @@ def run_stage_8():
         print(f"    Stage 4:  {data.get('persona', {}).get('stage4_endpoint')}")
 
 
+def _ensure_shell_token():
+    """Harvest Crumb #1 and #2 so the verification suite has a valid shell token."""
+    if not state["crumbs"]["stage1"]:
+        run_stage_1()
+    if not state["crumbs"]["stage2"]:
+        run_stage_2()
+    return state["crumbs"]["stage2"] or "vk_live_fallback"
+
+
+def run_verification_suite():
+    print(f"\n{BLUE}{BOLD}================ MENTOR CRITIQUE VERIFICATION SUITE ================{RESET}")
+
+    token = _ensure_shell_token()
+
+    # 1. Zero-day LLM emulation: an unusual command outside static rules 100500-100506.
+    print(f"\n{BLUE}[1/3] Dynamic LLM Kernel (Zero-Day Rule 100599){RESET}")
+    for cmd in ["find / -perm -4000 2>/dev/null", "awk -F: '{print $1}' /etc/passwd"]:
+        print(f"{CYAN}deployer@jumpbox:~$ {BOLD}{cmd}{RESET}")
+        res = req("/api/shell/exec", method="POST", headers={"Authorization": f"Bearer {token}"}, json_data={"command": cmd})
+        if res and res.status_code == 200:
+            data = res.json()
+            if data.get("stdout"):
+                sys.stdout.write(data["stdout"])
+            z = data.get("zero_day_eval") or {}
+            if z:
+                print(f"{YELLOW}    -> Zero-Day Eval: {z.get('intent_summary')}{RESET}")
+                print(f"{YELLOW}       ATT&CK {z.get('dynamic_mitre_attack')} | D3FEND {z.get('dynamic_mitre_d3fend')} | Engage {z.get('dynamic_mitre_engage')} | risk +{z.get('risk_delta')}{RESET}")
+
+    # 2. Anti-Docker cloaking proof.
+    print(f"\n{BLUE}[2/3] Anti-Docker / Bare-Metal Cloaking{RESET}")
+    res = req("/api/shell/exec", method="POST", headers={"Authorization": f"Bearer {token}"}, json_data={"command": "cat /proc/1/cgroup && ls /.dockerenv"})
+    if res and res.status_code == 200:
+        data = res.json()
+        sys.stdout.write(data.get("stdout", ""))
+        sys.stdout.write(data.get("stderr", ""))
+    else:
+        print(f"{DIM}(multi-command fallback not available — try individual probes){RESET}")
+
+    # 3. Wazuh round-trip node check.
+    print(f"\n{BLUE}[3/3] Wazuh Round-Trip Node{RESET}")
+    res = req("/api/status")
+    if res and res.status_code == 200:
+        node = res.json().get("wazuhNode", "unknown")
+        print(f"{GREEN}    Wazuh Indexer Node: {node}{RESET}")
+        print(f"{DIM}    Every trap/shell event is forwarded, queried back, and broadcast with wazuh_verified.{RESET}")
+
+    print(f"\n{GREEN}{BOLD}================ VERIFICATION SUITE COMPLETE ================{RESET}")
+
+
 def main():
     load_persistent_state()
     while True:
         render_header()
         render_menu()
         try:
-            choice = input(f"{BOLD}{CYAN}Select action [0-8]: {RESET}").strip()
+            choice = input(f"{BOLD}{CYAN}Select action [0-9]: {RESET}").strip()
         except (KeyboardInterrupt, EOFError):
             print("\nExiting...")
             break
@@ -405,12 +455,14 @@ def main():
         elif choice == "7":
             run_stage_7()
         elif choice == "8":
+            run_verification_suite()
+        elif choice == "9":
             run_stage_8()
         elif choice in ["0", "exit", "q"]:
             print(f"\n{GREEN}Demo session terminated. Goodbye!{RESET}\n")
             break
         else:
-            print(f"{RED}Invalid option: '{choice}'. Please select 0-8.{RESET}")
+            print(f"{RED}Invalid option: '{choice}'. Please select 0-9.{RESET}")
 
         try:
             input(f"\n{DIM}Press [ENTER] to return to menu...{RESET}")

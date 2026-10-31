@@ -1,0 +1,74 @@
+{
+  "_index": "wazuh-alerts-4.x-2026.10.31",
+  "_id": "sample-document-001",
+  "_score": null,
+  "_source": {
+    "timestamp": "2026-10-31T10:30:00.000Z",
+    "id": "1793442600.1001",
+    "agent": {
+      "id": "000",
+      "name": "wazuh-manager"
+    },
+    "manager": {
+      "name": "wazuh-manager"
+    },
+    "cluster": {
+      "name": "wazuh",
+      "node": "wazuh-manager"
+    },
+    "rule": {
+      "id": "100101",
+      "level": 10,
+      "description": "Repeated SSH honeypot authentication failures",
+      "groups": [
+        "d3c0y",
+        "honeypot",
+        "authentication_failed"
+      ],
+      "firedtimes": 6,
+      "mail": false,
+      "mitre": {
+        "id": [
+          "T1110"
+        ],
+        "tactic": [
+          "Credential Access"
+        ],
+        "technique": [
+          "Brute Force"
+        ]
+      }
+    },
+    "decoder": {
+      "name": "json"
+    },
+    "location": "/d3c0y/logs/cowrie.json",
+    "data": {
+      "honeypot": "cowrie",
+      "event_type": "login_failed",
+      "source_ip": "192.0.2.15",
+      "source_port": 54321,
+      "destination_port": 2222,
+      "protocol": "ssh",
+      "session_id": "session-abc123",
+      "username": "admin",
+      "attempt_count": 6
+    },
+    "full_log": "{\"honeypot\":\"cowrie\",\"event_type\":\"login_failed\",\"source_ip\":\"192.0.2.15\",\"source_port\":54321,\"destination_port\":2222,\"protocol\":\"ssh\",\"session_id\":\"session-abc123\",\"username\":\"admin\",\"attempt_count\":6\"}",
+    "input": {
+      "type": "log"
+    },
+    "previous_output": "Previous related event, if provided by the rule",
+    "GeoLocation": {
+      "country_name": "Example Country",
+      "city_name": "Example City",
+      "location": {
+        "lat": 0.0,
+        "lon": 0.0
+      }
+    }
+  },
+  "sort": [
+    1793442600000
+  ]
+}

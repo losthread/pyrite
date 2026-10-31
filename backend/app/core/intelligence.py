@@ -290,6 +290,17 @@ class SocWebSocketManager:
                     "message": "Adaptive Tarpit throttled down to 128B / 2.0s (~0.06 KB/s)."
                 })
 
+        elif action == "ENGAGE_ENDLESSH_TARPIT":
+            target = ja4h or (get_all_shadow_worlds()[0]["ja4h"] if get_all_shadow_worlds() else None)
+            if target:
+                engage_tarpit_speed(target, chunk_bytes=1, interval_s=10.0)
+                await self.broadcast("action_ack", {
+                    "action": "ENGAGE_ENDLESSH_TARPIT",
+                    "targetJa4h": target,
+                    "status": "SUCCESS",
+                    "message": "Endlessh infinite slow-drip engaged: 1 byte / 10.0s (Cliff Stoll tarpit)."
+                })
+
         elif action == "PLAUSIBLE_WAF_DROP":
             target = ja4h or (get_all_shadow_worlds()[0]["ja4h"] if get_all_shadow_worlds() else None)
             if target:

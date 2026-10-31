@@ -9,6 +9,8 @@ import os
 import time
 from typing import Dict, Any, Optional
 
+from app.core import wazuh_client
+
 LOGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "logs"))
 LOG_FILE_PATH = os.path.join(LOGS_DIR, "vyuh_deception.json")
 
@@ -27,7 +29,30 @@ def evaluate_wazuh_rule(event: Dict[str, Any]) -> Dict[str, Any]:
     action = event.get("action", {})
     action_title = action.get("title", "")
 
-    # Priority 1: Anomaly - Syndicate Collusion or Burned Token Replay
+    # Priority 0: Dynamic out-of-band behavioral anomaly (zero-day classifier).
+    zero_day = event.get("zero_day_eval")
+    if zero_day:
+        return {
+            "ruleId": 100599,
+            "level": 14,
+            "severity": "HIGH",
+            "description": (
+                "VYUH [Zero-Day - Out-of-Band Behavioral Anomaly]: "
+                + str(zero_day.get("intent_summary", "Novel command"))[:180]
+            ),
+            "mitreAttack": {
+                "id": zero_day.get("dynamic_mitre_attack", "T1059.004"),
+                "name": "Dynamic Behavioral Anomaly",
+            },
+            "mitreD3fend": {
+                "id": zero_day.get("dynamic_mitre_d3fend", "D3-EDA"),
+                "name": "Dynamic Execution Decoy",
+            },
+            "mitreEngage": {
+                "id": zero_day.get("dynamic_mitre_engage", "EAC0012"),
+                "name": "Synthetic Environment Confinement",
+            },
+        }
     if attacker.get("tokenShared") or attacker.get("token_shared") or attacker.get("topologyMutated") or attacker.get("topology_mutated"):
         return {
             "ruleId": 100506,
@@ -119,3 +144,19 @@ def write_deception_log(event: Dict[str, Any]) -> None:
             f.write(json.dumps(log_entry, separators=(",", ":")) + "\n")
     except Exception as e:
         print(f"[!] [WAZUH BRIDGE] Error writing log: {e}")
+
+
+def roundtrip_to_wazuh(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Push a deception event to the live Wazuh Indexer and query it back.
+    Falls back to {"wazuh_verified": false} on any network error so the SOC
+    stream never hangs on a slow venue connection.
+    """
+    try:
+        return wazuh_client.roundtrip(event)
+    except Exception:  # noqa: BLE001 - guarantee a graceful fallback
+        return {
+            "wazuh_verified": False,
+            "wazuh_node": wazuh_client.INDEXER_URL,
+            "wazuh_fallback": True,
+        }
