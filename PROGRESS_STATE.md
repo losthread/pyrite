@@ -24,7 +24,12 @@ Legend: `[ ]` PENDING · `[~]` IN_PROGRESS · `[x]` COMPLETED
 - Next Immediate Action: Module 3 (LLM kernel + rule 100599)
 
 ## Module 3 — DeepSeek LLM Kernel + Zero-Day Rule 100599
-- [ ] PENDING
+- [x] Add `backend/app/stages/generative_shell.py` (DeepSeek + deterministic fallback)
+- [x] Zero-day eval: intent_summary, dynamic ATT&CK/D3FEND/Engage, risk_delta
+- [x] Wire novel commands through `virtual_shell.py` + virtual FS persistence
+- [x] Add Wazuh Rule 100599 mapping in `wazuh_bridge.py` + stage-3 emit
+- Files: stages/generative_shell.py, stages/virtual_shell.py, core/wazuh_bridge.py, stages/routes.py
+- Next Immediate Action: Module 4 (anti-docker cloak + noise + Endlessh)
 
 ## Module 4 — Anti-Docker Cloaking, Living Noise, Endlessh Tarpit
 - [ ] PENDING

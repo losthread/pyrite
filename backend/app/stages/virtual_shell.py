@@ -9,6 +9,11 @@ import time
 from typing import Dict, Any
 from app.core.crumb_crypto import mint_crumb
 from app.core.shadow_world import get_active_topology
+from app.stages.generative_shell import (
+    apply_virtual_fs,
+    execute_generative_shell,
+    list_virtual_fs,
+)
 
 
 def execute_virtual_shell(command: str, session: Dict[str, Any], ja4h: str) -> Dict[str, Any]:
@@ -67,6 +72,11 @@ def execute_virtual_shell(command: str, session: Dict[str, Any], ja4h: str) -> D
         return {"stdout": "/home/deployer\n", "stderr": "", "exit_code": 0, "crumb_minted": None}
 
     elif clean_cmd in ["ls", "ls -l", "ls -la", "ls -al"]:
+        virtual_entries = list_virtual_fs(ja4h)
+        virtual_block = ""
+        if virtual_entries:
+            for vf in virtual_entries:
+                virtual_block += f"-rw-r--r-- 1 deployer deployer  128 Oct 31 08:40 {vf}\n"
         return {
             "stdout": """total 44
 drwxr-xr-x 6 deployer deployer 4096 Oct 31 08:20 .
@@ -78,7 +88,7 @@ drwx------ 2 deployer deployer 4096 Oct 25 14:12 .ssh
 drwxr-xr-x 2 deployer deployer 4096 Oct 31 08:15 /opt/scripts
 -rw-r--r-- 1 deployer deployer  807 Jan  6  2022 .profile
 -rw-r--r-- 1 deployer deployer  112 Oct 31 07:44 README.vault.txt
-""",
+""" + virtual_block,
             "stderr": "",
             "exit_code": 0,
             "crumb_minted": None
@@ -228,6 +238,12 @@ ID_LIKE=debian
             "crumb_minted": None
         }
 
-    # Default unknown command
-    first_word = clean_cmd.split()[0] if clean_cmd.split() else "command"
-    return {"stdout": "", "stderr": f"bash: {first_word}: command not found\n", "exit_code": 127, "crumb_minted": None}
+    # Record touch / mkdir / echo-redirect into the attacker's virtual FS.
+    if apply_virtual_fs(clean_cmd, ja4h):
+        return {"stdout": "", "stderr": "", "exit_code": 0, "crumb_minted": None}
+
+    # Novel commands fall through to the generative LLM kernel, which also
+    # returns a zero-day behavioral classification (Wazuh Rule 100599).
+    return execute_generative_shell(
+        clean_cmd, session, ja4h, hostname, ip, stage4_endpoint, crumb3
+    )

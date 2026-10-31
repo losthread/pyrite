@@ -55,7 +55,8 @@ async def emit_telemetry_event(
     crumb_used: Optional[str],
     threat_score: int,
     dwell_time_seconds: int,
-    polymorphic_seed: str
+    polymorphic_seed: str,
+    zero_day_eval: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Helper to evaluate Wazuh rule, persist to SQLite, log to file, and broadcast over WebSocket."""
     raw_event = {
@@ -83,6 +84,9 @@ async def emit_telemetry_event(
             "polymorphicSeed": polymorphic_seed
         }
     }
+
+    if zero_day_eval:
+        raw_event["zero_day_eval"] = zero_day_eval
 
     # Evaluate Wazuh Rule
     wazuh_eval = evaluate_wazuh_rule(raw_event)
@@ -426,7 +430,8 @@ async def handle_stage_3(request: Request):
         crumb_used=token,
         threat_score=max(session["threat_score"], 85),
         dwell_time_seconds=dwell,
-        polymorphic_seed=seed_id
+        polymorphic_seed=seed_id,
+        zero_day_eval=result.get("zero_day_eval")
     )
 
     return JSONResponse(status_code=200, content=result)

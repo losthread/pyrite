@@ -29,7 +29,30 @@ def evaluate_wazuh_rule(event: Dict[str, Any]) -> Dict[str, Any]:
     action = event.get("action", {})
     action_title = action.get("title", "")
 
-    # Priority 1: Anomaly - Syndicate Collusion or Burned Token Replay
+    # Priority 0: Dynamic out-of-band behavioral anomaly (zero-day classifier).
+    zero_day = event.get("zero_day_eval")
+    if zero_day:
+        return {
+            "ruleId": 100599,
+            "level": 14,
+            "severity": "HIGH",
+            "description": (
+                "VYUH [Zero-Day - Out-of-Band Behavioral Anomaly]: "
+                + str(zero_day.get("intent_summary", "Novel command"))[:180]
+            ),
+            "mitreAttack": {
+                "id": zero_day.get("dynamic_mitre_attack", "T1059.004"),
+                "name": "Dynamic Behavioral Anomaly",
+            },
+            "mitreD3fend": {
+                "id": zero_day.get("dynamic_mitre_d3fend", "D3-EDA"),
+                "name": "Dynamic Execution Decoy",
+            },
+            "mitreEngage": {
+                "id": zero_day.get("dynamic_mitre_engage", "EAC0012"),
+                "name": "Synthetic Environment Confinement",
+            },
+        }
     if attacker.get("tokenShared") or attacker.get("token_shared") or attacker.get("topologyMutated") or attacker.get("topology_mutated"):
         return {
             "ruleId": 100506,
