@@ -8,6 +8,7 @@ Interactive Python CLI demo for live pitch presentations.
 """
 
 import sys
+import os
 import time
 import re
 import json
@@ -27,6 +28,8 @@ WHITE = "\033[37m"
 BG_RED = "\033[41m"
 BG_GREEN = "\033[42m"
 
+STATE_FILE = os.path.join(os.path.dirname(__file__), ".attacker_state.json")
+
 state = {
     "target_url": "http://localhost:8000",
     "attacker_ip": "185.220.101.4",  # Pre-seeded for East-West correlation demo
@@ -39,6 +42,30 @@ state = {
         "stage3": None
     }
 }
+
+
+def load_persistent_state():
+    try:
+        if os.path.exists(STATE_FILE):
+            with open(STATE_FILE, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+                if "crumbs" in saved:
+                    state["crumbs"].update(saved["crumbs"])
+                if "attacker_ip" in saved:
+                    state["attacker_ip"] = saved["attacker_ip"]
+    except Exception:
+        pass
+
+
+def save_persistent_state():
+    try:
+        with open(STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump({
+                "crumbs": state["crumbs"],
+                "attacker_ip": state["attacker_ip"]
+            }, f, indent=2)
+    except Exception:
+        pass
 
 
 def req(path, method="GET", headers=None, json_data=None, stream=False):
@@ -137,6 +164,7 @@ def run_stage_1():
     match = re.search(r"vk_live_[A-Za-z0-9_-]+\.[a-f0-9]{10}", res.text)
     if match:
         state["crumbs"]["stage1"] = match.group(0)
+        save_persistent_state()
         print(f"\n{GREEN}{BOLD}[+] SUCCESS: Discovered Crumb #1 Honeytoken!{RESET}")
         print(f"    Token: {CYAN}{match.group(0)}{RESET}")
         print(f"    {DIM}Wazuh Rule 100501 (Level 5) evaluated and broadcast to SOC.{RESET}")
@@ -172,6 +200,7 @@ def run_stage_2():
         dumped_token = data.get("results", [{}])[0].get("ssh_auth_token")
         if dumped_token:
             state["crumbs"]["stage2"] = dumped_token
+            save_persistent_state()
             print(f"\n{GREEN}{BOLD}[+] SUCCESS: Harvested DevOps Jumpbox SSH Honeytoken (Crumb #2)!{RESET}")
             print(f"    SSH Auth Token: {CYAN}{dumped_token}{RESET}")
             print(f"    {DIM}Wazuh Rule 100503 (Level 10) evaluated and broadcast to SOC.{RESET}")
@@ -210,6 +239,7 @@ def run_stage_3():
                 state["crumbs"]["stage3"] = match.group(0)
 
     if state["crumbs"]["stage3"]:
+        save_persistent_state()
         print(f"\n{GREEN}{BOLD}[+] SUCCESS: Discovered Cold Vault Master Key (Crumb #3)!{RESET}")
         print(f"    Stolen Master Key: {CYAN}{state['crumbs']['stage3']}{RESET}")
         print(f"    {DIM}Wazuh Rule 100504 (Level 12) evaluated and stream sent to SOC.{RESET}")
@@ -271,6 +301,7 @@ def run_stage_4():
 def run_stage_5():
     old_ip = state["attacker_ip"]
     state["attacker_ip"] = "194.26.29.112"  # Mullvad VPN Frankfurt
+    save_persistent_state()
 
     print(f"\n{YELLOW}[*] Simulating VPN Hop: Attacker rotated IP address!{RESET}")
     print(f"    Previous IP: {DIM}{old_ip}{RESET}")
@@ -308,14 +339,24 @@ def run_stage_7():
     print(f"\n{RED}[*] Testing Burned Token Tripwire: Replaying token from obsolete topology...{RESET}")
     stale_token = state["crumbs"]["stage2"] or state["crumbs"]["stage1"]
     if not stale_token:
-        print(f"{YELLOW}[!] Please run Stage 1 or Stage 2 first to harvest a token.{RESET}")
-        return
+        print(f"{YELLOW}[*] Auto-harvesting token from active topology to test mutation tripwire...{RESET}")
+        res_tmp = req(state.get("persona", {}).get("stage1_endpoint", "/.git/logs/HEAD"))
+        if res_tmp:
+            m = re.search(r"vk_live_[A-Za-z0-9_-]+\.[a-f0-9]{10}", res_tmp.text)
+            if m:
+                stale_token = m.group(0)
+                state["crumbs"]["stage1"] = stale_token
+                save_persistent_state()
 
-    print("    1. Rotating honeypot topology on server...")
+    if not stale_token:
+        stale_token = "vk_live_eyJzIjoxLCJmIjoiMTIwZTA4MmQzZTA0YWNkYiIsInQiOjE3OTM0NDI3OTQ4MTEsInNlZWQiOiJNb3JwaC12MS4wIChGaW50ZWNoLUdpdC1TUUxpKSJ9.8d95f08cc4"
+
+    print(f"    1. Active Token: {DIM}{stale_token[:25]}...{RESET}")
+    print("    2. Rotating honeypot topology on server to burn previous tokens...")
     req("/api/mutate", method="POST")
     sync_status()
-    print(f"    2. New Server Active Seed: {CYAN}{state['active_seed']}{RESET}")
-    print(f"    3. Replaying obsolete token: {DIM}{stale_token[:25]}...{RESET}")
+    print(f"    3. New Server Active Seed: {CYAN}{state['active_seed']}{RESET}")
+    print(f"    4. Replaying now-obsolete token: {DIM}{stale_token[:25]}...{RESET}")
 
     res = req("/api/shell/exec", method="POST", headers={"Authorization": f"Bearer {stale_token}"}, json_data={"command": "ls -la"})
     if res:
@@ -339,6 +380,7 @@ def run_stage_8():
 
 
 def main():
+    load_persistent_state()
     while True:
         render_header()
         render_menu()
