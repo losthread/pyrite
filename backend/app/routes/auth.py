@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from ..models.auth import UserRegister, UserLogin, GoogleLoginRequest
 from ..crud import auth
 
-router = APIRouter(prefix="/auth")
+router = APIRouter()
 
 @router.post('/register')
 async def register(user: UserRegister) -> dict:

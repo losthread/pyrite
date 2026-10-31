@@ -7,6 +7,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 import jwt
 import os
+import secrets
 
 # load env variables
 load_dotenv()
@@ -14,7 +15,10 @@ load_dotenv()
 # JWT auth
 JWT_SECRET = os.getenv("JWT_KEY")
 if not JWT_SECRET:
-    raise RuntimeError("JWT_KEY environment variable is required")
+    # Demo-safe fallback: an ephemeral key keeps the server bootable without a
+    # configured secret. Tokens will not survive a restart.
+    JWT_SECRET = secrets.token_hex(32)
+    print("[!] [AUTH] JWT_KEY missing; using an ephemeral random key.")
 ALGORITHM = "HS256"
 
 # instantiate password hasher
