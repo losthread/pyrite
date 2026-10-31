@@ -43,6 +43,10 @@ node_modules/
 venv/
 
 
+# Docs
+docs/
+
+
 # DB & State
 *.db
 *.sqlite3

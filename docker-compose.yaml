@@ -7,6 +7,13 @@ services:
       - "8003:8000"
     volumes:
       - ./backend:/app
+      - ./backend/logs:/app/logs
+    environment:
+      - WAZUH_MODE=${WAZUH_MODE:-real}
+      - WAZUH_INDEXER_URL=${WAZUH_INDEXER_URL:-https://10.46.34.107:9200}
+      - WAZUH_USERNAME=${WAZUH_USERNAME:-admin}
+      - WAZUH_PASSWORD=${WAZUH_PASSWORD:-admin}
+      - WAZUH_INDEX_PATTERN=${WAZUH_INDEX_PATTERN:-wazuh-alerts*}
 
   frontend:
     build:
@@ -16,3 +23,4 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+
