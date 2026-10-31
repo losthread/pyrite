@@ -72,7 +72,11 @@ def forward_event(event: Dict[str, Any]) -> Dict[str, Any]:
     doc = normalize_event(event)
     try:
         with _client() as client:
-            response = client.post(f"{INDEXER_URL}/{VYUH_INDEX}/_doc", json=doc)
+            # refresh=true makes the document immediately searchable so the
+            # round-trip query can verify it without waiting on the 1s refresh.
+            response = client.post(
+                f"{INDEXER_URL}/{VYUH_INDEX}/_doc?refresh=true", json=doc
+            )
             return {
                 "forwarded": response.status_code in (200, 201),
                 "status": response.status_code,

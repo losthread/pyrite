@@ -184,7 +184,10 @@ def execute_generative_shell(
             "dynamic_mitre_d3fend": "D3-EDA",
             "dynamic_mitre_engage": "EAC0012",
             "risk_delta": 3,
+            "__generated__": False,
         }
+    else:
+        result.setdefault("__generated__", True)
 
     zero_day_eval = {
         "intent_summary": str(result.get("intent_summary") or "Novel shell command")[
@@ -209,5 +212,5 @@ def execute_generative_shell(
         "exit_code": int(result.get("exit_code") or 0),
         "crumb_minted": crumb3 if "vault_sync" in command else None,
         "zero_day_eval": zero_day_eval,
-        "llm_generated": result.get("__generated__", True),
+        "llm_generated": bool(result.get("__generated__")),
     }
