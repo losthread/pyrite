@@ -17,7 +17,11 @@ Legend: `[ ]` PENDING · `[~]` IN_PROGRESS · `[x]` COMPLETED
 - Next Immediate Action: Module 2 (Wazuh round-trip)
 
 ## Module 2 — Real Wazuh Round-Trip Pipeline (10.46.34.107:9200)
-- [ ] PENDING
+- [x] Add `backend/app/core/wazuh_client.py` (forward + query + 1.5s fallback)
+- [x] Wire round-trip into `wazuh_bridge.py` + `stages/routes.py` emit path
+- [x] `wazuh_verified` / `wazuh_node` / `wazuh_fallback` surfaced to /ws/soc
+- Files: core/wazuh_client.py, core/wazuh_bridge.py, stages/routes.py
+- Next Immediate Action: Module 3 (LLM kernel + rule 100599)
 
 ## Module 3 — DeepSeek LLM Kernel + Zero-Day Rule 100599
 - [ ] PENDING

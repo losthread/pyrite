@@ -9,6 +9,8 @@ import os
 import time
 from typing import Dict, Any, Optional
 
+from app.core import wazuh_client
+
 LOGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "logs"))
 LOG_FILE_PATH = os.path.join(LOGS_DIR, "vyuh_deception.json")
 
@@ -119,3 +121,19 @@ def write_deception_log(event: Dict[str, Any]) -> None:
             f.write(json.dumps(log_entry, separators=(",", ":")) + "\n")
     except Exception as e:
         print(f"[!] [WAZUH BRIDGE] Error writing log: {e}")
+
+
+def roundtrip_to_wazuh(event: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Push a deception event to the live Wazuh Indexer and query it back.
+    Falls back to {"wazuh_verified": false} on any network error so the SOC
+    stream never hangs on a slow venue connection.
+    """
+    try:
+        return wazuh_client.roundtrip(event)
+    except Exception:  # noqa: BLE001 - guarantee a graceful fallback
+        return {
+            "wazuh_verified": False,
+            "wazuh_node": wazuh_client.INDEXER_URL,
+            "wazuh_fallback": True,
+        }

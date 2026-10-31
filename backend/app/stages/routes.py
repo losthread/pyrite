@@ -28,7 +28,7 @@ from app.core.shadow_world import (
     engage_tarpit_speed,
     get_shadow_world
 )
-from app.core.wazuh_bridge import evaluate_wazuh_rule, write_deception_log
+from app.core.wazuh_bridge import evaluate_wazuh_rule, write_deception_log, roundtrip_to_wazuh
 from app.core.intelligence import (
     persist_telemetry_event,
     ws_manager,
@@ -95,7 +95,16 @@ async def emit_telemetry_event(
     # 1. Write structured single-line JSON log for Wazuh
     write_deception_log(raw_event)
 
-    # 2. Persist to SQLite
+    # 2. Round-trip to the live Wazuh Indexer (forward + query back) with a
+    #    graceful local fallback when the venue network is unavailable.
+    wazuh_roundtrip = await asyncio.to_thread(roundtrip_to_wazuh, raw_event)
+    raw_event["wazuh"]["wazuh_verified"] = wazuh_roundtrip.get("wazuh_verified", False)
+    raw_event["wazuh"]["wazuh_node"] = wazuh_roundtrip.get("wazuh_node")
+    raw_event["wazuh"]["wazuh_fallback"] = wazuh_roundtrip.get("wazuh_fallback", True)
+    if wazuh_roundtrip.get("wazuh_alert"):
+        raw_event["wazuh"]["wazuh_alert"] = wazuh_roundtrip["wazuh_alert"]
+
+    # 3. Persist to SQLite
     persist_telemetry_event(raw_event)
 
     # 3. Broadcast to all connected SOC analysts over WebSocket
