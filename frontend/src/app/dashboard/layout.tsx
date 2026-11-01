@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
 import { DashboardShell } from "@/components/dashboard/dashboard-shell"
-import { DashboardProvider } from "@/hooks/useDashboardTelemetry"
+import { PyriteTelemetryProvider } from "@/hooks/usePyriteTelemetry"
 
 export const metadata: Metadata = {
   title: "PYRITE // SOC Command Center",
@@ -15,8 +15,8 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <DashboardProvider>
+    <PyriteTelemetryProvider>
       <DashboardShell>{children}</DashboardShell>
-    </DashboardProvider>
+    </PyriteTelemetryProvider>
   )
 }

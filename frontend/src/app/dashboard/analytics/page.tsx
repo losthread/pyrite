@@ -10,7 +10,7 @@ import {
   VolumeChart,
 } from "@/components/dashboard/charts"
 import { Panel, StatusPill } from "@/components/dashboard/primitives"
-import { useDashboardTelemetry } from "@/hooks/useDashboardTelemetry"
+import { useDashboardTelemetry } from "@/hooks/usePyriteTelemetry"
 import { cn } from "@/lib/utils"
 
 type Range = "1h" | "24h" | "7d"

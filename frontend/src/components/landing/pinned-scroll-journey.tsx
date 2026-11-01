@@ -121,7 +121,7 @@ export function PinnedScrollJourney() {
         end: "+=2400",
         pin: true,
         scrub: 0.6,
-        onUpdate: (self) => {
+        onUpdate: (self: { progress: number }) => {
           const step = Math.min(3, Math.floor(self.progress * 4))
           setActiveStep(step)
         },

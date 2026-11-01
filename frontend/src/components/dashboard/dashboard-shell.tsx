@@ -10,19 +10,16 @@ import {
   LayoutDashboard,
   Menu,
   Network,
-  Pause,
   Play,
   Radio,
   RefreshCw,
   Server,
   ShieldAlert,
   Flame,
-  Zap,
   X,
 } from "lucide-react"
 
 import { usePyriteTelemetry } from "@/hooks/usePyriteTelemetry"
-import { RedTeamAttackConsole } from "@/components/dashboard/redteam-attack-console"
 import { cn } from "@/lib/utils"
 
 const navigation = [
@@ -30,12 +27,6 @@ const navigation = [
     group: "Operations & Red Team",
     items: [
       { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
-      {
-        label: "Live Attack Console (Red Team)",
-        href: "#red-team",
-        icon: Zap,
-        isAction: true,
-      },
       { label: "Topology & Shadow Worlds", href: "/dashboard/network", icon: Network },
       { label: "Wazuh SIEM Stream", href: "/dashboard/events", icon: Radio },
       { label: "Tri-MITRE Matrix", href: "/dashboard/analytics", icon: ChartNoAxesCombined },
@@ -89,13 +80,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     togglePause,
     refresh,
     quarantineAttacker,
-    engageEndlesshTarpit,
     burnAndMutateTopology,
   } = usePyriteTelemetry()
 
   const [collapsed, setCollapsed] = React.useState(false)
   const [mobileOpen, setMobileOpen] = React.useState(false)
-  const [attackConsoleOpen, setAttackConsoleOpen] = React.useState(false)
   const [clock, setClock] = React.useState("12:00:00")
   const [containmentFeedback, setContainmentFeedback] = React.useState<string | null>(null)
 
@@ -113,12 +102,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const handleQuarantine = async () => {
     await quarantineAttacker()
     setContainmentFeedback("QUARANTINE_504_SENT")
-    setTimeout(() => setContainmentFeedback(null), 3000)
-  }
-
-  const handleEndlessh = async () => {
-    await engageEndlesshTarpit()
-    setContainmentFeedback("ENDLESSH_ENGAGED")
     setTimeout(() => setContainmentFeedback(null), 3000)
   }
 
@@ -198,38 +181,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <ul className="space-y-1">
                 {group.items.map((item) => {
                   const Icon = item.icon
-                  const isAttack = Boolean(item.isAction)
                   const active =
-                    !isAttack &&
-                    (pathname === item.href ||
-                      (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`)))
+                    pathname === item.href ||
+                    (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`))
                   const count = item.href === "/dashboard/events" ? criticalEvents : null
-
-                  if (isAttack) {
-                    return (
-                      <li key={item.label}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAttackConsoleOpen(true)
-                            setMobileOpen(false)
-                          }}
-                          className={cn(
-                            "group relative flex w-full h-9 items-center gap-2.5 px-2.5 text-[12px] font-medium transition-colors border border-signal/40 bg-signal/10 text-signal hover:bg-signal hover:text-black font-mono",
-                            collapsed && "justify-center px-0"
-                          )}
-                          title="Open Live Red-Team Attack Console"
-                        >
-                          <Icon className="size-4 shrink-0 text-signal group-hover:text-black" strokeWidth={2} />
-                          {!collapsed ? (
-                            <span className="truncate font-bold tracking-tight uppercase">
-                              {item.label}
-                            </span>
-                          ) : null}
-                        </button>
-                      </li>
-                    )
-                  }
 
                   return (
                     <li key={item.href}>
@@ -347,15 +302,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
           {/* REAL SOC CONTAINMENT ACTIONS */}
           <div className="flex items-center gap-2">
-            {/* RED-TEAM CONSOLE DRAWER TRIGGER */}
-            <button
-              onClick={() => setAttackConsoleOpen(true)}
-              className="flex items-center gap-1.5 bg-signal text-black px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wider hover:brightness-110 shadow-lg shadow-signal/20 transition-all"
-            >
-              <Zap className="size-3.5 fill-current" />
-              <span>⚔️ Live Attack Console</span>
-            </button>
-
             {/* QUARANTINE 504 WAF EXIT BUTTON */}
             <button
               onClick={handleQuarantine}
@@ -364,16 +310,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             >
               <ShieldAlert className="size-3 text-red-500" />
               <span>504 WAF Exit</span>
-            </button>
-
-            {/* ENGAGE ENDLESSH TARPIT */}
-            <button
-              onClick={handleEndlessh}
-              className="hidden xl:flex items-center gap-1.5 border border-[#F59E0B]/60 bg-[#F59E0B]/10 text-[#F59E0B] px-2.5 py-1.5 font-mono text-[9px] font-bold uppercase hover:bg-[#F59E0B]/20 transition-colors"
-              title="Engage 1 byte / 10s Endlessh infinite slow-drip tarpit"
-            >
-              <Pause className="size-3 fill-current" />
-              <span>Endlessh Tarpit</span>
             </button>
 
             {/* BURN & MUTATE TOPOLOGY */}
@@ -428,12 +364,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
-
-      {/* SLIDE-OVER RED-TEAM ATTACK CONSOLE */}
-      <RedTeamAttackConsole
-        isOpen={attackConsoleOpen}
-        onClose={() => setAttackConsoleOpen(false)}
-      />
     </div>
   )
 }

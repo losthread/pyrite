@@ -10,7 +10,7 @@ import {
   Panel,
   StatusPill,
 } from "@/components/dashboard/primitives"
-import { useDashboardTelemetry } from "@/hooks/useDashboardTelemetry"
+import { useDashboardTelemetry } from "@/hooks/usePyriteTelemetry"
 import type { Severity } from "@/lib/dashboard/types"
 import { cn } from "@/lib/utils"
 

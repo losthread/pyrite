@@ -10,7 +10,7 @@ import {
   Zap,
 } from "lucide-react"
 
-import { useDashboardTelemetry } from "@/hooks/useDashboardTelemetry"
+import { useDashboardTelemetry } from "@/hooks/usePyriteTelemetry"
 import { cn } from "@/lib/utils"
 
 export function DemoControls({ compact = false }: { compact?: boolean }) {

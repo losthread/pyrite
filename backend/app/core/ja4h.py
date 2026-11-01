@@ -53,15 +53,21 @@ def extract_client_identity(request: Request) -> Dict[str, Any]:
     # 5. Header Key Order
     # request.headers.raw is a list of (name_bytes, value_bytes) preserving wire order
     raw_header_keys = []
+    excluded = [
+        "x-forwarded-for", "x-real-ip", "host", "connection",
+        "authorization", "x-debug-token", "x-ssh-token", "x-vault-key",
+        "x-client-fingerprint", "cookie", "content-length", "content-type",
+        "transfer-encoding", "accept-encoding",
+    ]
     if hasattr(request, "headers") and hasattr(request.headers, "raw"):
         for name_bytes, _ in request.headers.raw:
             h_name = name_bytes.decode("latin1", errors="ignore").lower()
-            if h_name not in ["x-forwarded-for", "x-real-ip", "host", "connection"]:
+            if h_name not in excluded:
                 raw_header_keys.append(h_name)
     else:
         for k in request.headers.keys():
             k_lower = k.lower()
-            if k_lower not in ["x-forwarded-for", "x-real-ip", "host", "connection"]:
+            if k_lower not in excluded:
                 raw_header_keys.append(k_lower)
 
     header_order_sig = ",".join(raw_header_keys[:10])

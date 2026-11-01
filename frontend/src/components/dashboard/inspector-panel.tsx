@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowUpRight, ShieldAlert, Pause, Zap, X } from "lucide-react"
+import { ArrowUpRight, ShieldAlert, X } from "lucide-react"
 
 import type {
   NetworkConnection,
@@ -43,7 +43,6 @@ export function InspectorPanel({
     activeSeed,
     activePersona,
     quarantineAttacker,
-    engageEndlesshTarpit,
   } = usePyriteTelemetry()
 
   if (!node && !edge) {
@@ -256,14 +255,6 @@ export function InspectorPanel({
               >
                 <ShieldAlert className="size-3 text-red-500" />
                 504 WAF Drop
-              </button>
-              <button
-                onClick={() => engageEndlesshTarpit(node.label)}
-                className="flex items-center justify-center gap-1 border border-[#F59E0B]/50 bg-[#F59E0B]/10 text-[#F59E0B] px-2 py-1.5 font-mono text-[9px] font-bold uppercase hover:bg-[#F59E0B]/20 transition-colors"
-                title="Slow-drip 1 byte / 10s"
-              >
-                <Pause className="size-3 fill-current" />
-                Endlessh Tarpit
               </button>
             </div>
           </div>

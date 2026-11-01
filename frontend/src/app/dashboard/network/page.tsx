@@ -7,7 +7,7 @@ import { DemoControls } from "@/components/dashboard/demo-controls"
 import { InspectorPanel } from "@/components/dashboard/inspector-panel"
 import { NetworkGraph } from "@/components/dashboard/network-graph"
 import { Panel, StatusPill } from "@/components/dashboard/primitives"
-import { useDashboardTelemetry } from "@/hooks/useDashboardTelemetry"
+import { useDashboardTelemetry } from "@/hooks/usePyriteTelemetry"
 
 export default function NetworkIntelligencePage() {
   const { mode, connection, paused, snapshot, activeEdgeId } =

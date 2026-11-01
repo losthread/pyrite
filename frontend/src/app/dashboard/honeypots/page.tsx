@@ -9,7 +9,7 @@ import {
   SeverityDot,
   StatusPill,
 } from "@/components/dashboard/primitives"
-import { useDashboardTelemetry } from "@/hooks/useDashboardTelemetry"
+import { useDashboardTelemetry } from "@/hooks/usePyriteTelemetry"
 import type { Honeypot, HoneypotStatus } from "@/lib/dashboard/types"
 import {
   formatNumber,
