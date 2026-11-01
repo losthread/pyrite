@@ -2,6 +2,7 @@ import Link from "next/link"
 import { ArrowRight, ArrowUpRight } from "lucide-react"
 
 import HalftoneWordmarkFooter from "@/components/ui/halftone-wordmark-footer"
+import { PyriteCrystalCanvas } from "@/components/landing/pyrite-crystal-canvas"
 import { palette } from "@/config/labyrinthConfig"
 
 export function WordmarkMasthead() {
@@ -20,26 +21,34 @@ export function WordmarkMasthead() {
             <span className="micro-sm text-muted-ink">Morph-v2.0</span>
           </div>
 
-          <div className="flex flex-1 items-center justify-center">
-            <HalftoneWordmarkFooter
-              as="div"
-              chrome={false}
-              wordmark="pyrite"
-              preset="paper"
-              palette={{
-                background: palette.background,
-                ink: palette.ink,
-                warm: palette.accent,
-              }}
-              fit="contain"
-              dotGap={6.5}
-              radius={150}
-              grain={0.5}
-              fontWeight={400}
-              fontFamily='"Archivo Black", "Arial Black", Impact, sans-serif'
-              monoFamily='"IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace'
-              height="clamp(200px, 24vw, 360px)"
-            />
+          <div className="relative flex flex-1 items-center justify-center overflow-hidden min-h-[300px]">
+            {/* 3D Interactive Pyrite Crystal Labyrinth Canvas */}
+            <div className="absolute inset-0 z-0 opacity-45 hover:opacity-100 transition-opacity">
+              <PyriteCrystalCanvas className="w-full h-full" />
+            </div>
+
+            {/* Giant Dot-Matrix Wordmark */}
+            <div className="relative z-10 w-full pointer-events-none">
+              <HalftoneWordmarkFooter
+                as="div"
+                chrome={false}
+                wordmark="pyrite"
+                preset="paper"
+                palette={{
+                  background: "transparent",
+                  ink: palette.ink,
+                  warm: palette.accent,
+                }}
+                fit="contain"
+                dotGap={6.5}
+                radius={150}
+                grain={0.5}
+                fontWeight={400}
+                fontFamily='"Archivo Black", "Arial Black", Impact, sans-serif'
+                monoFamily='"IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace'
+                height="clamp(200px, 24vw, 360px)"
+              />
+            </div>
           </div>
 
           <div className="flex items-center justify-between border-t border-ink px-3 py-2 sm:px-5">
