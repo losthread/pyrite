@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Server } from "lucide-react"
+import { Server, RefreshCw } from "lucide-react"
 
 import { DemoControls } from "@/components/dashboard/demo-controls"
 import {
@@ -174,7 +174,34 @@ function HoneypotCard({
 }
 
 function HoneypotDetail({ honeypot }: { honeypot: Honeypot }) {
-  const { snapshot } = useDashboardTelemetry()
+  const { snapshot, refresh } = useDashboardTelemetry()
+  const [feedback, setFeedback] = React.useState<string | null>(null)
+
+  const handleMutatePersona = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/mutate", { method: "POST" })
+      if (res.ok) {
+        setFeedback("Persona mutated · Seed rotated")
+        refresh?.()
+        setTimeout(() => setFeedback(null), 3000)
+      }
+    } catch {
+      setFeedback("Mutation request failed")
+    }
+  }
+
+  const handleFlushBuffer = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/telemetry/reset", { method: "POST" })
+      if (res.ok) {
+        setFeedback("Decoy session buffer flushed cleanly")
+        refresh?.()
+        setTimeout(() => setFeedback(null), 3000)
+      }
+    } catch {
+      setFeedback("Flush failed")
+    }
+  }
   const events = snapshot.events.filter(
     (event) => event.destination === honeypot.name
   )
@@ -210,23 +237,28 @@ function HoneypotDetail({ honeypot }: { honeypot: Honeypot }) {
         ))}
       </dl>
 
-      <div className="mt-4 border-t border-ink/10 pt-3">
+      <div className="mt-4 border-t border-ink/10 pt-3 space-y-2">
         <p className="font-mono text-[9px] tracking-[0.08em] text-muted-ink uppercase">
-          Associated attackers
+          Operator Actions
         </p>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {attackers.map((attacker) => (
-            <span
-              key={attacker.id}
-              className="border border-ink/15 px-1.5 py-0.5 font-mono text-[9px] text-muted-ink"
-            >
-              {attacker.ip}
-            </span>
-          ))}
-          {!attackers.length ? (
-            <span className="text-[10.5px] text-muted-ink">None observed.</span>
-          ) : null}
+        <div className="flex gap-2">
+          <button
+            onClick={handleMutatePersona}
+            className="flex-1 flex items-center justify-center gap-1.5 border border-amber-500/60 bg-amber-950/30 text-amber-300 px-3 py-1.5 font-mono text-[10px] font-bold uppercase hover:bg-amber-900/40 transition-colors"
+          >
+            <RefreshCw className="size-3" />
+            <span>Mutate Persona</span>
+          </button>
+          <button
+            onClick={handleFlushBuffer}
+            className="flex items-center justify-center gap-1.5 border border-ink/20 bg-ink/5 text-muted-ink px-3 py-1.5 font-mono text-[10px] font-bold uppercase hover:text-ink hover:bg-ink/10 transition-colors"
+          >
+            Flush Buffer
+          </button>
         </div>
+        {feedback && (
+          <p className="font-mono text-[9px] text-amber-400 mt-1">{feedback}</p>
+        )}
       </div>
 
       <div className="mt-4 border-t border-ink/10 pt-3">

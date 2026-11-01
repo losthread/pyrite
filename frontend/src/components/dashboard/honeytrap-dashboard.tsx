@@ -1181,7 +1181,7 @@ function NetworkTopologyCanvas({
 
     for (const att of filteredAttackers) {
       const p = positionsRef.current[att.id];
-      if (p && Math.hypot(wx - p.x, wy - p.y) <= 16) {
+      if (p && Math.hypot(wx - p.x, wy - p.y) <= 28) {
         dragRef.current = { isPanning: false, dragNodeId: att.id, startX: sx, startY: sy };
         onSelectEntity({ kind: 'ATTACKER', data: att });
         return;
@@ -1189,7 +1189,7 @@ function NetworkTopologyCanvas({
     }
     for (const hp of filteredHoneypots) {
       const p = positionsRef.current[hp.id];
-      if (p && Math.hypot(wx - p.x, wy - p.y) <= 20) {
+      if (p && Math.hypot(wx - p.x, wy - p.y) <= 32) {
         dragRef.current = { isPanning: false, dragNodeId: hp.id, startX: sx, startY: sy };
         onSelectEntity({ kind: 'HONEYPOT', data: hp });
         return;
@@ -1745,24 +1745,49 @@ function EntityInspectorPanel({
       </div>
 
       {/* Bottom Action Bar */}
-      <div className="pt-2.5 border-t border-[#27272A] mt-3 flex items-center gap-1.5">
-        {(data.ip || data.name) && (
-          <button
-            onClick={() => copyText(data.ip || data.name)}
-            className="flex-1 py-1.5 px-2 bg-[#18181B] border border-[#27272A] text-[#F1EFE9] hover:border-[#F1EFE9] uppercase text-[9.5px] font-bold flex items-center justify-center gap-1"
-          >
-            {copied ? <Check size={11} /> : <Copy size={11} />}
-            {copied ? 'COPIED' : 'COPY IDENTIFIER'}
-          </button>
-        )}
-        {kind === 'ATTACKER' && data.status !== 'Contained' && (
-          <button
-            onClick={() => onContainAttacker(data)}
-            className="flex-1 py-1.5 px-2 bg-[#FF493D] text-[#0B0B0C] hover:bg-[#F1EFE9] uppercase text-[9.5px] font-bold flex items-center justify-center gap-1"
-          >
-            <Lock size={11} />
-            ISOLATE IN CAGE
-          </button>
+      <div className="pt-2.5 border-t border-[#27272A] mt-3 flex flex-col gap-1.5">
+        <div className="flex items-center gap-1.5">
+          {(data.ip || data.name) && (
+            <button
+              onClick={() => copyText(data.ip || data.name)}
+              className="flex-1 py-1.5 px-2 bg-[#18181B] border border-[#27272A] text-[#F1EFE9] hover:border-[#F1EFE9] uppercase text-[9.5px] font-bold flex items-center justify-center gap-1"
+            >
+              {copied ? <Check size={11} /> : <Copy size={11} />}
+              {copied ? 'COPIED' : 'COPY IDENTIFIER'}
+            </button>
+          )}
+          {kind === 'ATTACKER' && data.status !== 'Contained' && (
+            <button
+              onClick={() => onContainAttacker(data)}
+              className="flex-1 py-1.5 px-2 bg-[#FF493D] text-[#0B0B0C] hover:bg-[#F1EFE9] uppercase text-[9.5px] font-bold flex items-center justify-center gap-1 shadow-sm hover:shadow-red-500/20"
+            >
+              <Lock size={11} />
+              QUARANTINE (504 WAF)
+            </button>
+          )}
+          {kind === 'ATTACKER' && data.status === 'Contained' && (
+            <span className="flex-1 py-1.5 px-2 bg-[#27272A] text-[#FF493D] uppercase text-[9.5px] font-bold flex items-center justify-center gap-1 border border-[#FF493D]/40">
+              <Lock size={11} />
+              CONTAINED (504 ACTIVE)
+            </span>
+          )}
+        </div>
+        {kind === 'HONEYPOT' && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => onMutateHoneypot?.()}
+              className="flex-1 py-1.5 px-2 bg-[#18181B] border border-[#FF493D]/50 text-[#FF493D] hover:bg-[#FF493D] hover:text-[#0B0B0C] uppercase text-[9.5px] font-bold flex items-center justify-center gap-1"
+            >
+              <RefreshCw size={11} />
+              MUTATE PERSONA
+            </button>
+            <button
+              onClick={() => onResetGrid?.()}
+              className="py-1.5 px-2 bg-[#18181B] border border-[#27272A] text-[#9A9891] hover:text-[#F1EFE9] uppercase text-[9.5px] font-bold flex items-center justify-center gap-1"
+            >
+              FLUSH
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -1799,6 +1824,93 @@ export default function App({
   );
   const [isMonitoringActive, setIsMonitoringActive] = useState(true);
   const [demoStepIndex, setDemoStepIndex] = useState(0);
+
+  // SOC Interactive Operator Handlers
+  const handleContainAttacker = useCallback(async (targetAttacker: any) => {
+    if (!targetAttacker) return;
+    const ip = targetAttacker.ip;
+    const ja4h = targetAttacker.ja4h;
+
+    setAttackers((prev) =>
+      prev.map((a) =>
+        a.id === targetAttacker.id || a.ip === ip
+          ? {
+              ...a,
+              status: 'Contained',
+              payloads: [
+                ...(a.payloads || []),
+                `[PLAUSIBLE WAF EXIT] Contained in microVM isolation. Next request receives HTTP 504.`,
+              ],
+            }
+          : a
+      )
+    );
+
+    setSelectedEntity((prev: any) =>
+      prev?.kind === 'ATTACKER' && (prev.data.id === targetAttacker.id || prev.data.ip === ip)
+        ? { kind: 'ATTACKER', data: { ...prev.data, status: 'Contained' } }
+        : prev
+    );
+
+    setStatusBanner({
+      level: 'critical',
+      text: `QUARANTINE 504 EXIT: Adversary ${ip || ja4h} isolated. Next request receives HTTP 504 Gateway Timeout.`,
+    });
+
+    try {
+      const apiBase = typeof window !== 'undefined'
+        ? `${window.location.protocol}//${window.location.hostname || 'localhost'}:8000`
+        : 'http://localhost:8000';
+      await fetch(`${apiBase}/api/quarantine`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip, ja4h, contained: true }),
+      });
+    } catch (e) {
+      console.warn('Quarantine request failed:', e);
+    }
+  }, []);
+
+  const handleMutateHoneypot = useCallback(async () => {
+    try {
+      const apiBase = typeof window !== 'undefined'
+        ? `${window.location.protocol}//${window.location.hostname || 'localhost'}:8000`
+        : 'http://localhost:8000';
+      const res = await fetch(`${apiBase}/api/mutate`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setStatusBanner({
+          level: 'info',
+          text: `🧬 POLYMORPHISM: Active seed mutated to ${data.new_seed || 'Morph-v2.0'} · Previous breadcrumbs burned`,
+        });
+        setHoneypots((prev) => prev.map((hp, idx) => {
+          const angle = (idx * (360 / prev.length) + 20) * (Math.PI / 180);
+          return { ...hp, x: Math.round(155 * Math.sin(angle)), y: Math.round(-155 * Math.cos(angle)) };
+        }));
+      }
+    } catch (e) {
+      console.warn('Mutate call failed:', e);
+    }
+  }, []);
+
+  const handleResetTelemetry = useCallback(async () => {
+    try {
+      const apiBase = typeof window !== 'undefined'
+        ? `${window.location.protocol}//${window.location.hostname || 'localhost'}:8000`
+        : 'http://localhost:8000';
+      await fetch(`${apiBase}/api/telemetry/reset`, { method: 'POST' });
+      setAttackers([]);
+      setEvents([]);
+      setTotalAttacksCount(0);
+      setSelectedEntity(null);
+      setStatusBanner({
+        level: 'info',
+        text: 'TELEMETRY RESET: Grid and active sessions flushed cleanly.',
+      });
+    } catch (e) {
+      console.warn('Reset call failed:', e);
+    }
+  }, []);
 
   // Core Data State (Pure Real & Explicit Simulated Telemetry — Zero Dummy Data)
   const [infraNodes] = useState(INITIAL_INFRA_NODES);
@@ -1871,13 +1983,18 @@ export default function App({
   };
 
   // Append telemetry event
+  // Append telemetry event with guaranteed unique keys & deduplication
   const appendEvent = useCallback((evt) => {
+    const uniqueId = evt.id || `evt-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
     const newEvt = {
-      id: `EVT-${Math.floor(1000 + Math.random() * 8999)}`,
       timestamp: getNowTimestamp(),
       ...evt,
+      id: uniqueId,
     };
-    setEvents((prev) => [newEvt, ...prev.slice(0, 79)]);
+    setEvents((prev) => {
+      if (prev.some((e) => e.id === uniqueId)) return prev;
+      return [newEvt, ...prev.slice(0, 79)];
+    });
     setInspectedEvent(newEvt);
   }, []);
 
@@ -2312,18 +2429,16 @@ export default function App({
               level: 'critical',
               text: `TARPIT ENGAGED: Adversary ${payload.ja4h?.slice(0, 8)} throttled to ${payload.speed || '128 B/2s'}`,
             });
-          } else {
-            appendEvent({
-              id: payload.id || `evt-${Date.now()}`,
-              severity: payload.severity || 'high',
-              source: payload.source || '0.0.0.0',
-              destination: payload.destination || 'honeypot-ssh-01',
-              protocol: payload.protocol || 'TCP',
-              type: payload.type || 'LIVE_TELEMETRY',
-              description: payload.description || 'Live socket frame received',
-              raw: msg.data,
+          } else if (msgType === 'action_ack') {
+            setStatusBanner({
+              level: 'info',
+              text: `ACTION CONFIRMED: ${payload.message || 'SOC Command Executed'}`,
             });
-            setTotalAttacksCount((c) => c + 1);
+          } else if (msgType === 'terminal_stream') {
+            // Live terminal stream data frame (does not increment attacks)
+          } else {
+            // Informational socket frame
+            console.log('[PYRITE WS Frame]', msgType, payload);
           }
         } catch (err) {
           // malformed frame ignore
@@ -2580,7 +2695,9 @@ export default function App({
                 selectedEntity={selectedEntity}
                 onClose={() => setSelectedEntity(null)}
                 events={events}
-                onContainAttacker={triggerDemoCapture}
+                onContainAttacker={handleContainAttacker}
+                onMutateHoneypot={handleMutateHoneypot}
+                onResetGrid={handleResetTelemetry}
                 isLiveMode={operatingMode === 'LIVE'}
                 compactSidebar={true}
               />
@@ -2878,41 +2995,47 @@ export default function App({
               ))}
             </section>
 
-            {/* Full-Width Centerpiece Topology Graph (Extended 100% to Right Edge) */}
+            {/* Centerpiece Topology Graph with Dynamic SOC Inspector Pane */}
             <section className="w-full">
-              <NetworkTopologyCanvas
-                infraNodes={infraNodes}
-                honeypots={honeypots}
-                attackers={attackers}
-                selectedEntity={selectedEntity}
-                onSelectEntity={setSelectedEntity}
-                nodeCategoryFilter={nodeCategoryFilter}
-                setNodeCategoryFilter={setNodeCategoryFilter}
-                severityFilter={severityFilter}
-                setSeverityFilter={setSeverityFilter}
-                honeypotFilter={honeypotFilter}
-                setHoneypotFilter={setHoneypotFilter}
-                graphSearch={graphSearch}
-                setGraphSearch={setGraphSearch}
-                isPaused={!isMonitoringActive}
-                setIsPaused={(val) => setIsMonitoringActive(!val)}
-                reducedMotion={reducedMotion}
-                isFullscreen={isFullscreenGraph}
-                setIsFullscreen={setIsFullscreenGraph}
-                compactHeight={true}
-              />
+              <div className={selectedEntity ? "grid grid-cols-1 xl:grid-cols-4 gap-3 items-start" : "w-full"}>
+                <div className={selectedEntity ? "xl:col-span-3 transition-all duration-300" : "w-full transition-all duration-300"}>
+                  <NetworkTopologyCanvas
+                    infraNodes={infraNodes}
+                    honeypots={honeypots}
+                    attackers={attackers}
+                    selectedEntity={selectedEntity}
+                    onSelectEntity={setSelectedEntity}
+                    nodeCategoryFilter={nodeCategoryFilter}
+                    setNodeCategoryFilter={setNodeCategoryFilter}
+                    severityFilter={severityFilter}
+                    setSeverityFilter={setSeverityFilter}
+                    honeypotFilter={honeypotFilter}
+                    setHoneypotFilter={setHoneypotFilter}
+                    graphSearch={graphSearch}
+                    setGraphSearch={setGraphSearch}
+                    isPaused={!isMonitoringActive}
+                    setIsPaused={(val) => setIsMonitoringActive(!val)}
+                    reducedMotion={reducedMotion}
+                    isFullscreen={isFullscreenGraph}
+                    setIsFullscreen={setIsFullscreenGraph}
+                    compactHeight={true}
+                  />
+                </div>
+                {selectedEntity && (
+                  <div className="xl:col-span-1 w-full animate-in fade-in slide-in-from-right-4 duration-200">
+                    <EntityInspectorPanel
+                      selectedEntity={selectedEntity}
+                      onClose={() => setSelectedEntity(null)}
+                      events={events}
+                      onContainAttacker={handleContainAttacker}
+                      onMutateHoneypot={handleMutateHoneypot}
+                      onResetGrid={handleResetTelemetry}
+                      isLiveMode={operatingMode === 'LIVE'}
+                    />
+                  </div>
+                )}
+              </div>
             </section>
-
-            {/* Mobile-only Inspector Fallback (since desktop inspector is docked below Settings in left sidebar) */}
-            <div className="block md:hidden">
-              <EntityInspectorPanel
-                selectedEntity={selectedEntity}
-                onClose={() => setSelectedEntity(null)}
-                events={events}
-                onContainAttacker={triggerDemoCapture}
-                isLiveMode={operatingMode === 'LIVE'}
-              />
-            </div>
 
             {/* Compact Bottom Live Telemetry Ticker */}
             <section className="bg-[#141416] border border-[#27272A]">
@@ -2936,9 +3059,9 @@ export default function App({
                     <span className="text-[#F1EFE9] font-bold">GRID LISTENING</span> · No adversary intrusions logged yet. Launch Red Team attack simulation to trigger telemetry.
                   </div>
                 ) : (
-                  events.slice(0, 4).map((ev) => (
+                  events.slice(0, 4).map((ev, idx) => (
                     <div
-                      key={ev.id}
+                      key={`${ev.id}-${idx}`}
                       onClick={() => {
                         const att = attackers.find((a) => a.ip === ev.source);
                         if (att) setSelectedEntity({ kind: 'ATTACKER', data: att });

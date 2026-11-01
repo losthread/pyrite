@@ -388,9 +388,12 @@ def build_snapshot() -> dict[str, Any]:
             "raw": raw,
         })
 
-    # Build Honeypots list with live counters
+    # Build Honeypots list with live counters computed per honeypot
     honeypots_output: list[dict[str, Any]] = []
     for hp in ALL_HONEYPOTS:
+        matching_attackers = [a for a in attackers if hp["id"] in a.get("honeypots", [])]
+        hp_interactions = sum(a.get("attempts", 1) for a in matching_attackers)
+        is_attacked = len(matching_attackers) > 0
         honeypots_output.append({
             "id": hp["id"],
             "name": hp["name"],
@@ -398,11 +401,11 @@ def build_snapshot() -> dict[str, Any]:
             "ip": hp["ip"],
             "type": hp["type"],
             "service": hp.get("service", hp["type"]),
-            "status": hp["status"],
-            "sessions": active_attackers if hp["id"] == "honeypot-ssh-01" else 0,
-            "interactions": total_attacks if hp["id"] == "honeypot-ssh-01" else 0,
+            "status": "under_attack" if is_attacked else "online",
+            "sessions": len(matching_attackers),
+            "interactions": hp_interactions,
             "lastActivity": now_iso,
-            "severity": "critical" if (active_attackers > 0 and hp["id"] == "honeypot-ssh-01") else "info",
+            "severity": "critical" if any(a.get("severity") == "critical" for a in matching_attackers) else ("suspicious" if is_attacked else "info"),
             "protocols": hp["protocols"],
             "region": hp.get("region", "eu-central-1"),
         })

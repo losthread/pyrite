@@ -30,6 +30,7 @@ TOPOLOGY_PERSONAS = {
         "stage4_endpoint": "/s3/v1/treasury-keys",
         "stage4_asset": "treasury_private_keys.pem"
     },
+ 
     "Morph-v3.0": {
         "id": "Morph-v3.0",
         "name": "Morph-v3.0 (ZeroTrust-OAuth-Kubernetes)",
