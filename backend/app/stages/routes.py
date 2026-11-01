@@ -575,7 +575,15 @@ async def get_system_status():
 
 @router.get("/api/shadow-worlds")
 async def get_shadow_world_sessions():
-    return {"sessions": get_all_shadow_worlds()}
+    return {"sessions": get_all_shadow_worlds(active_only=True)}
+
+
+@router.post("/api/telemetry/reset")
+async def reset_live_telemetry():
+    from app.core.shadow_world import clear_all_shadow_worlds
+    clear_all_shadow_worlds()
+    await ws_manager.broadcast("telemetry_reset", {"status": "RESET", "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())})
+    return {"status": "SUCCESS", "message": "Adversary sessions and telemetry cleared for fresh demo."}
 
 
 @router.get("/api/prod-logs")

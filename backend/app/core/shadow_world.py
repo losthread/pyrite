@@ -46,8 +46,25 @@ TOPOLOGY_PERSONAS = {
 # Current active polymorphic seed
 current_seed_id = TOPOLOGY_PERSONAS["Morph-v1.0"]["name"]
 
+# Session TTL in seconds (Attacks inactive for > 5 minutes are considered expired)
+SESSION_TTL_SECONDS = 300
+
 # In-Memory Session Store: ja4h -> dict
 shadow_worlds: Dict[str, Dict[str, Any]] = {}
+
+def clear_all_shadow_worlds() -> None:
+    """Clears all in-memory shadow world adversary sessions."""
+    global shadow_worlds
+    shadow_worlds.clear()
+
+def prune_stale_shadow_worlds(max_age_seconds: int = SESSION_TTL_SECONDS) -> int:
+    """Removes sessions older than max_age_seconds from memory."""
+    global shadow_worlds
+    now = time.time()
+    stale_keys = [k for k, s in shadow_worlds.items() if (now - s.get("last_seen", now)) > max_age_seconds]
+    for k in stale_keys:
+        shadow_worlds.pop(k, None)
+    return len(stale_keys)
 
 # Pre-seeded East-West Production Auth Logs (Matches perimeter enterprise telemetry)
 prod_auth_logs: List[Dict[str, Any]] = [
@@ -202,10 +219,18 @@ def engage_tarpit_speed(ja4h: str, chunk_bytes: int = 128, interval_s: float = 2
     return False
 
 
-def get_all_shadow_worlds() -> List[Dict[str, Any]]:
+def get_all_shadow_worlds(active_only: bool = True) -> List[Dict[str, Any]]:
     now = time.time()
-    return [
-        {
+    if active_only:
+        prune_stale_shadow_worlds(SESSION_TTL_SECONDS)
+
+    results = []
+    for s in list(shadow_worlds.values()):
+        age = now - s.get("last_seen", now)
+        is_active = age <= SESSION_TTL_SECONDS
+        if active_only and not is_active:
+            continue
+        results.append({
             "ja4h": s["ja4h"],
             "current_ip": s["current_ip"],
             "initial_ip": s["initial_ip"],
@@ -217,7 +242,9 @@ def get_all_shadow_worlds() -> List[Dict[str, Any]]:
             "plausible_waf_drop": s["plausible_waf_drop"],
             "tarpit_active": s["tarpit_active"],
             "command_count": len(s["command_history"]),
-            "last_seen": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(s["last_seen"]))
-        }
-        for s in shadow_worlds.values()
-    ]
+            "last_seen": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(s["last_seen"])),
+            "last_seen_ts": s["last_seen"],
+            "is_active": is_active,
+            "seconds_inactive": int(age)
+        })
+    return results

@@ -43,7 +43,6 @@ export function InspectorPanel({
     activeSeed,
     activePersona,
     quarantineAttacker,
-    engageEndlesshTarpit,
   } = usePyriteTelemetry()
 
   if (!node && !edge) {
@@ -248,22 +247,14 @@ export function InspectorPanel({
             <p className="font-mono text-[8.5px] text-muted-ink uppercase tracking-wider">
               Containment Controls:
             </p>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="flex">
               <button
                 onClick={() => quarantineAttacker(node.label)}
-                className="flex items-center justify-center gap-1 border border-red-500/50 bg-red-950/40 text-red-400 px-2 py-1.5 font-mono text-[9px] font-bold uppercase hover:bg-red-900/60 transition-colors"
+                className="w-full flex items-center justify-center gap-1.5 border border-red-500/50 bg-red-950/40 text-red-400 px-3 py-2 font-mono text-[10px] font-bold uppercase hover:bg-red-900/60 transition-colors"
                 title="Inject Plausible 504 WAF Exit timeout"
               >
-                <ShieldAlert className="size-3 text-red-500" />
-                504 WAF Drop
-              </button>
-              <button
-                onClick={() => engageEndlesshTarpit(node.label)}
-                className="flex items-center justify-center gap-1 border border-[#F59E0B]/50 bg-[#F59E0B]/10 text-[#F59E0B] px-2 py-1.5 font-mono text-[9px] font-bold uppercase hover:bg-[#F59E0B]/20 transition-colors"
-                title="Slow-drip 1 byte / 10s"
-              >
-                <Pause className="size-3 fill-current" />
-                Endlessh Tarpit
+                <ShieldAlert className="size-3.5 text-red-500" />
+                Quarantine (504 WAF Drop)
               </button>
             </div>
           </div>

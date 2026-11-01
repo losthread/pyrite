@@ -93,5 +93,15 @@ Legend: `[ ]` PENDING · `[~]` IN_PROGRESS · `[x]` COMPLETED
   - `INITIAL_HONEYPOTS` interactions reset from fake numbers (1482, 3290, etc.) to 0 baseline.
   - `ANALYTICS_SERIES` and `demoSnapshot` purged of fabricated counts.
   - Real data pipeline connected: WebSocket and REST endpoints dynamically populate real sessions from FastAPI SQLite/Wazuh and real attacks executed from Red Team console / CLI simulator.
-- Files: frontend/src/components/dashboard/honeytrap-dashboard.tsx, frontend/src/lib/dashboard/data.ts, backend/app/routes/dashboard.py, frontend/src/components/landing/wordmark-masthead.tsx, frontend/src/components/landing/site-footer.tsx, frontend/src/components/landing/command-cta.tsx, frontend/src/components/dashboard/redteam-attack-console.tsx, backend/app/stages/routes.py, attacker-cli/attack_sim.py
+- Files: frontend/src/components/dashboard/honeytrap-dashboard.tsx, frontend/src/lib/dashboard/data.ts, backend/app/routes/dashboard.py, frontend/src/components/landing/site-footer.tsx, frontend/src/components/landing/command-cta.tsx, backend/app/stages/routes.py, attacker-cli/attack_sim.py
+
+## Module 11 — Judge Live Demo Architecture: Honeypot Sync & Graph Stability
+- [x] Synchronized all 8 backend honeypot nodes (`cowrie-ssh`, `web-api-envoy`, `pg-ledger`, `redis-vault`, `scada-plc`, `iot-busybox`, `mqtt-telemetry`, `cold-vault`) into frontend topology and `/api/dashboard/snapshot`.
+- [x] Resolved reload graph discrepancies by implementing strict IP-based adversary deduplication (`mapSessionsToAttackerNodes`) and deterministic coordinates.
+- [x] Implemented 5-minute (300s) Session TTL in backend `shadow_world.py` and automatic pruning interval in frontend `honeytrap-dashboard.tsx`.
+- [x] Removed Live Attack Console drawer and navigation links from `/dashboard`.
+- [x] Removed Endlessh Tarpit button from top action bar and inspector panel; kept Quarantine (504 WAF Drop) and Mutate Seed.
+- [x] Added `Reset Grid` (`/api/dashboard/reset`) control for fresh live demo runs.
+- [x] Verified all backend and frontend endpoints return HTTP 200.
+
 

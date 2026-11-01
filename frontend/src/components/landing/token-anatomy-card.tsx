@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 
 function toBase64Url(str: string): string {
   if (typeof Buffer !== "undefined") {
-    return Buffer.from(str, "utf-8").toString("base64url")
+    return Buffer.from(str, "utf-8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
   }
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
 }

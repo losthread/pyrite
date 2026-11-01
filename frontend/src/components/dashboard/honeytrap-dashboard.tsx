@@ -150,7 +150,7 @@ const INITIAL_INFRA_NODES = [
     connections: 312,
     firstSeen: '2025-01-01 00:00:00 UTC',
     lastSeen: 'Active',
-    x: -235,
+    x: -260,
     y: 0,
   },
   {
@@ -165,7 +165,7 @@ const INITIAL_INFRA_NODES = [
     connections: 518,
     firstSeen: '2025-01-01 00:00:00 UTC',
     lastSeen: 'Active',
-    x: 235,
+    x: 260,
     y: 0,
   },
 ];
@@ -290,6 +290,46 @@ const INITIAL_HONEYPOTS = [
     memory: 8,
     x: 0,
     y: 155,
+  },
+  {
+    id: 'honeypot-mqtt-07',
+    name: 'honeypot-mqtt-07',
+    ip: '10.240.5.18:1883',
+    nodeType: 'honeypot',
+    type: 'IoT Telemetry Broker Canary',
+    service: 'Eclipse Mosquitto Decoy Broker',
+    protocols: ['MQTT', 'TCP/1883'],
+    region: 'eu-west-1 (Dublin)',
+    status: 'Online',
+    severity: 'low',
+    uptime: '1d 04h 12m',
+    totalInteractions: 0,
+    activeSessions: 0,
+    lastActivity: 'Idle / Listening',
+    cpu: 2,
+    memory: 10,
+    x: -160,
+    y: 0,
+  },
+  {
+    id: 'honeypot-vault-08',
+    name: 'honeypot-vault-08',
+    ip: '10.240.6.12:8000',
+    nodeType: 'honeypot',
+    type: 'Cold Vault Exfiltration Canary',
+    service: 'Adaptive Tarpit Exfil Trapper',
+    protocols: ['HTTP', 'S3', 'TCP/8000'],
+    region: 'us-east-1 (Virginia)',
+    status: 'Online',
+    severity: 'low',
+    uptime: '1d 04h 12m',
+    totalInteractions: 0,
+    activeSessions: 0,
+    lastActivity: 'Idle / Listening',
+    cpu: 4,
+    memory: 18,
+    x: 160,
+    y: 0,
   },
 ];
 
@@ -1969,6 +2009,99 @@ export default function App({
     });
   };
 
+  // Unified deterministic mapping: Groups sessions by IP, enforces 5-min TTL, stable coordinates
+  const mapSessionsToAttackerNodes = useCallback((sessions: any[]) => {
+    if (!sessions || !Array.isArray(sessions) || sessions.length === 0) return [];
+    const now = Date.now();
+    const grouped = new Map<string, any>();
+
+    sessions.forEach((s) => {
+      const ip = s.current_ip || s.ip || s.initial_ip || '185.220.101.4';
+      const lastSeenMs = s.last_seen_ts ? (s.last_seen_ts * 1000) : (s.last_seen ? new Date(s.last_seen).getTime() : now);
+      // Discard sessions older than 5 minutes (300 seconds)
+      if (now - lastSeenMs > 300000) return;
+
+      if (!grouped.has(ip)) {
+        grouped.set(ip, {
+          ip,
+          sessions: [],
+          attempts: 0,
+          highestStage: 0,
+          threatScore: 0,
+          plausibleWafDrop: false,
+          prodCorrelated: false,
+          lastSeen: s.last_seen || 'Active',
+          lastSeenTs: lastSeenMs,
+          ja4h: s.ja4h,
+          targetedHoneypots: ['honeypot-ssh-01'],
+        });
+      }
+      const item = grouped.get(ip)!;
+      item.sessions.push(s);
+      item.attempts += (s.command_count || 1);
+      item.highestStage = Math.max(item.highestStage, s.highest_stage || 1);
+      item.threatScore = Math.max(item.threatScore, s.threat_score || 50);
+      item.lastSeenTs = Math.max(item.lastSeenTs, lastSeenMs);
+      if (s.plausible_waf_drop) item.plausibleWafDrop = true;
+      if (s.prod_correlated) item.prodCorrelated = true;
+    });
+
+    const result: any[] = [];
+    let idx = 0;
+    for (const [ip, g] of grouped.entries()) {
+      const canonicalId = `att-${ip.replace(/\./g, '-')}`;
+      const sev = g.threatScore >= 80 ? 'critical' : 'high';
+      const attackType = g.highestStage >= 4
+        ? 'Cold Vault Exfiltration'
+        : g.highestStage >= 3
+        ? 'Jumpbox Shell Esc'
+        : g.highestStage >= 2
+        ? 'SQLi HoneyPatch'
+        : 'Recon Probe';
+
+      result.push({
+        id: canonicalId,
+        ip,
+        nodeType: 'attacker',
+        asn: g.prodCorrelated ? 'Tor Exit (East-West Correlated)' : 'Adversary (Observed)',
+        attackType,
+        firstSeen: g.lastSeen,
+        lastSeen: 'Active',
+        lastSeenTs: g.lastSeenTs,
+        attempts: g.attempts,
+        targetedHoneypots: g.targetedHoneypots,
+        protocols: ['TCP', 'SSH'],
+        ports: [8000, 22],
+        severity: sev,
+        status: g.plausibleWafDrop ? 'Contained' : 'Active',
+        threatScore: g.threatScore,
+        ja4h: g.ja4h,
+        payloads: [],
+        x: -260,
+        y: -120 + (idx * 80),
+      });
+      idx++;
+    }
+    return result;
+  }, []);
+
+  // Auto-prune stale attacks from the live preview (TTL = 5 minutes / 300 seconds)
+  useEffect(() => {
+    const pruner = setInterval(() => {
+      const now = Date.now();
+      setAttackers((prev) => {
+        const active = prev.filter((a) => {
+          if (a.lastSeenTs) {
+            return (now - a.lastSeenTs) < 300000;
+          }
+          return true;
+        });
+        return active.length !== prev.length ? active : prev;
+      });
+    }, 5000);
+    return () => clearInterval(pruner);
+  }, []);
+
   // Fetch real backend sessions on mount if present
   useEffect(() => {
     let active = true;
@@ -1981,30 +2114,9 @@ export default function App({
         if (res.ok && active) {
           const data = await res.json();
           const sessions = data.sessions || [];
-          if (sessions.length > 0) {
-            const mapped = sessions.map((s: any, idx: number) => ({
-              id: `att-real-${idx}`,
-              ip: s.current_ip || s.initial_ip || '185.220.101.4',
-              nodeType: 'attacker',
-              asn: s.prod_correlated ? 'Tor Exit (East-West Correlated)' : 'Adversary (Observed)',
-              attackType: s.highest_stage >= 4 ? 'Cold Vault Exfiltration' : s.highest_stage >= 3 ? 'Jumpbox Shell Esc' : s.highest_stage >= 2 ? 'SQLi HoneyPatch' : 'Recon Probe',
-              firstSeen: s.last_seen || 'Active',
-              lastSeen: 'Active',
-              attempts: s.command_count || 1,
-              targetedHoneypots: ['honeypot-ssh-01'],
-              protocols: ['TCP', 'SSH'],
-              ports: [8000, 22],
-              severity: s.threat_score >= 80 ? 'critical' : 'high',
-              status: s.plausible_waf_drop ? 'Contained' : 'Active',
-              threatScore: s.threat_score || 85,
-              ja4h: s.ja4h,
-              payloads: [],
-              x: -250 + (idx * 60),
-              y: -140 + (idx * 50),
-            }));
-            setAttackers(mapped);
-            setTotalAttacksCount((prev) => Math.max(prev, mapped.reduce((acc: number, a: any) => acc + a.attempts, 0)));
-          }
+          const mapped = mapSessionsToAttackerNodes(sessions);
+          setAttackers(mapped);
+          setTotalAttacksCount((prev) => Math.max(prev, mapped.reduce((acc: number, a: any) => acc + a.attempts, 0)));
         }
       } catch (e) {
         // backend offline on mount
@@ -2014,7 +2126,7 @@ export default function App({
     return () => {
       active = false;
     };
-  }, []);
+  }, [mapSessionsToAttackerNodes]);
 
   // ==========================================================================
   // LIVE BACKEND WEBSOCKET INTEGRATION (Never fabricates events)
@@ -2060,37 +2172,17 @@ export default function App({
               level: 'info',
               text: `PYRITE KERNEL ACTIVE · Seed ${payload.activeSeed || '0x' + (payload.seed || 0).toString(16)} · Wazuh: ONLINE`,
             });
-            const incomingSessions = payload.sessions || payload.active_attackers;
-            if (incomingSessions && Array.isArray(incomingSessions) && incomingSessions.length > 0) {
-              setAttackers((prev) => {
-                const map = new Map(prev.map((a) => [a.ip, a]));
-                incomingSessions.forEach((s: any, idx: number) => {
-                  const ip = s.current_ip || s.ip || s.initial_ip || '185.220.101.4';
-                  const existing = map.get(ip);
-                  map.set(ip, {
-                    id: s.id || existing?.id || `att-live-${ip.replace(/\./g, '-')}`,
-                    ip,
-                    nodeType: 'attacker',
-                    asn: s.asn || existing?.asn || 'Adversary (Observed)',
-                    attackType: s.highest_stage >= 4 ? 'Cold Vault Exfil' : s.highest_stage >= 3 ? 'Jumpbox Shell Esc' : s.highest_stage >= 2 ? 'SQLi Injection' : 'Recon Probe',
-                    firstSeen: s.last_seen || existing?.firstSeen || 'Live Session',
-                    lastSeen: 'Active',
-                    attempts: s.command_count || (existing ? existing.attempts + 1 : 1),
-                    targetedHoneypots: existing?.targetedHoneypots || ['honeypot-ssh-01'],
-                    protocols: existing?.protocols || ['TCP', 'SSH'],
-                    ports: existing?.ports || [8000, 22],
-                    severity: (s.threat_score >= 80 || s.severity === 'critical') ? 'critical' : 'high',
-                    status: s.plausible_waf_drop ? 'Contained' : (s.status || 'Active'),
-                    threatScore: s.threat_score || existing?.threatScore || 85,
-                    ja4h: s.ja4h,
-                    payloads: existing?.payloads || [],
-                    x: existing?.x || (-250 + (idx * 60)),
-                    y: existing?.y || (-130 + (idx * 50)),
-                  });
-                });
-                return Array.from(map.values());
-              });
-            }
+            const incomingSessions = payload.sessions || payload.active_attackers || [];
+            const mapped = mapSessionsToAttackerNodes(incomingSessions);
+            setAttackers(mapped);
+          } else if (msgType === 'telemetry_reset') {
+            setAttackers([]);
+            setEvents([]);
+            setTotalAttacksCount(0);
+            setStatusBanner({
+              level: 'info',
+              text: 'TELEMETRY RESET: Active grid cleared.',
+            });
           } else if (msgType === 'soc_telemetry') {
             const attackerInfo = payload.attacker || {};
             const actionInfo = payload.action || {};
@@ -2116,7 +2208,7 @@ export default function App({
               raw: msg.data,
             });
 
-            // Dynamically register / update attacker node on graph
+            // Dynamically register / update attacker node on graph with deterministic position
             setAttackers((prev) => {
               const existing = prev.find((a) => a.ip === attackerIp);
               if (existing) {
@@ -2126,6 +2218,7 @@ export default function App({
                         ...a,
                         attempts: a.attempts + 1,
                         lastSeen: currentTime,
+                        lastSeenTs: Date.now(),
                         targetedHoneypots: Array.from(new Set([...a.targetedHoneypots, endpoint])),
                         severity: sev,
                         threatScore: Math.min(100, (a.threatScore || 70) + 5),
@@ -2141,6 +2234,7 @@ export default function App({
                 attackType: title,
                 firstSeen: currentTime,
                 lastSeen: 'Active',
+                lastSeenTs: Date.now(),
                 attempts: 1,
                 targetedHoneypots: [endpoint],
                 protocols: ['TCP'],
@@ -2150,8 +2244,8 @@ export default function App({
                 threatScore: payload.metrics?.threatScore || 85,
                 ja4h: attackerInfo.ja4h,
                 payloads: [actionInfo.rawPayload || title],
-                x: -250 + (Math.random() * 80 - 40),
-                y: -140 + (Math.random() * 80 - 40),
+                x: -260,
+                y: -120 + (prev.length * 80),
               };
               return [newAttacker, ...prev];
             });
