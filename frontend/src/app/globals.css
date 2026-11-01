@@ -283,3 +283,14 @@
     animation: none;
   }
 }
+
+/* Pitch-Safe: Suppress dev overlays, toast banners and dialogs during live judging */
+nextjs-portal,
+[data-nextjs-toast],
+[data-nextjs-dialog-overlay],
+#nextjs__container_errors_desc,
+[data-nextjs-dialog] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

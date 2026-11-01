@@ -316,6 +316,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
           {/* REAL SOC CONTAINMENT ACTIONS */}
           <div className="flex items-center gap-2">
+            {/* GLOWING GOLD LIVE WAR ROOM DEMO LINK */}
+            <Link
+              href="/live-demo"
+              className="flex items-center gap-1.5 border border-[#F59E0B] bg-[#F59E0B]/20 text-[#F59E0B] px-3 py-1.5 font-mono text-[9px] font-extrabold uppercase hover:bg-[#F59E0B] hover:text-[#0A0A09] transition-all shadow-[0_0_14px_rgba(245,158,11,0.4)] animate-pulse"
+              title="Open Standalone Zero-Error Live War Room Demo Center"
+            >
+              <span>⚡ LIVE WAR ROOM DEMO</span>
+            </Link>
+
             {/* RESET TELEMETRY GRID */}
             <button
               onClick={handleResetGrid}

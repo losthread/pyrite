@@ -65,6 +65,13 @@ export function SiteHeader() {
             </span>
           </div>
           <Link
+            href="/live-demo"
+            className="flex items-center gap-1.5 border-r border-ink bg-[#F59E0B]/20 text-[#F59E0B] px-3 font-mono text-[11px] font-extrabold uppercase hover:bg-[#F59E0B] hover:text-[#0A0A09] transition-all shadow-[0_0_12px_rgba(245,158,11,0.35)] animate-pulse"
+            title="Open Standalone Zero-Error Live War Room Demo Center"
+          >
+            <span>⚡ LIVE WAR ROOM DEMO</span>
+          </Link>
+          <Link
             href="/dashboard"
             className="group flex min-w-[146px] items-center justify-between gap-4 bg-ink px-4 text-paper transition-colors hover:bg-signal hover:text-signal-ink sm:min-w-[176px] sm:px-5"
           >
