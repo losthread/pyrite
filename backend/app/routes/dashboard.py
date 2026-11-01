@@ -74,12 +74,23 @@ STAGE_HONEYPOT = {
     4: ("hp-vault", "vault-decoy"),
 }
 
-HONEYPOT_STAGES = {
-    "hp-cowrie": {3},
-    "hp-web": {1, 2},
-    "hp-graphql": set(),
-    "hp-vault": {4},
-}
+# Endpoint hints win over the stage default. Polymorphic personas route the same
+# stage through different decoys (Morph-v2.0 sends stage 2 to the GraphQL debug
+# gateway, stage 4 to the object-storage vault), so attribution must follow the
+# endpoint the attacker actually hit.
+ENDPOINT_TARGETS: tuple[tuple[str, tuple[str, str]], ...] = (
+    ("graphql", ("hp-graphql", "graphql-decoy")),
+    ("treasury", ("hp-vault", "vault-decoy")),
+    ("/s3/", ("hp-vault", "vault-decoy")),
+    ("vault", ("hp-vault", "vault-decoy")),
+    ("etcd", ("hp-vault", "vault-decoy")),
+    ("shell", ("hp-cowrie", "cowrie-ssh")),
+    ("cowrie", ("hp-cowrie", "cowrie-ssh")),
+    ("ssh", ("hp-cowrie", "cowrie-ssh")),
+)
+
+# Stable left-to-right ordering for edges and chips.
+DECOY_ORDER = ("web-decoy", "graphql-decoy", "cowrie-ssh", "vault-decoy")
 
 HONEYPOT_IDS = {hp["name"]: hp["id"] for hp in HONEYPOTS}
 
@@ -139,7 +150,16 @@ def _event_stage(raw: dict[str, Any]) -> int:
         return 0
 
 
-def _stage_target(stage: int) -> tuple[str, str]:
+def _event_endpoint(raw: dict[str, Any]) -> str:
+    return str((raw.get("action") or {}).get("endpoint") or "")
+
+
+def _resolve_target(stage: int, endpoint: str = "") -> tuple[str, str]:
+    """Return (honeypot id, honeypot name) for the decoy that received an event."""
+    haystack = str(endpoint or "").lower()
+    for needle, target in ENDPOINT_TARGETS:
+        if needle in haystack:
+            return target
     return STAGE_HONEYPOT.get(stage, ("hp-web", "web-decoy"))
 
 
@@ -256,8 +276,9 @@ def _build_analytics(
             severity_counts["Informational"] += 1
 
         stage = _event_stage(raw)
-        honeypot_counts[_stage_target(stage)[1]] += 1
-        protocol_counts["SSH" if stage == 3 else "HTTP"] += 1
+        target_id, target_name = _resolve_target(stage, _event_endpoint(raw))
+        honeypot_counts[target_name] += 1
+        protocol_counts["SSH" if target_id == "hp-cowrie" else "HTTP"] += 1
 
     # Unique attacker IPs per 5-minute slice of the live window.
     session_series: list[dict[str, Any]] = []
@@ -326,8 +347,12 @@ def build_snapshot() -> dict[str, Any]:
     critical_alerts = critical_db_events
 
     def interactions_for(honeypot_id: str) -> int:
-        stages = HONEYPOT_STAGES.get(honeypot_id, set())
-        return sum(1 for raw in raw_events if _event_stage(raw) in stages)
+        return sum(
+            1
+            for raw in raw_events
+            if _resolve_target(_event_stage(raw), _event_endpoint(raw))[0]
+            == honeypot_id
+        )
 
     # Decoy fleet + Wazuh manager (always present on the grid).
     nodes: list[dict[str, Any]] = []
@@ -390,6 +415,7 @@ def build_snapshot() -> dict[str, Any]:
                 "ja4h": attacker.get("ja4h"),
                 "events": 0,
                 "stages": set(),
+                "decoys": set(),
                 "first_ms": ts_ms,
                 "last_ms": ts_ms,
                 "max_level": 0,
@@ -397,6 +423,7 @@ def build_snapshot() -> dict[str, Any]:
         )
         group["events"] += 1
         group["stages"].add(stage)
+        group["decoys"].add(_resolve_target(stage, _event_endpoint(raw))[1])
         group["first_ms"] = min(group["first_ms"], ts_ms)
         group["last_ms"] = max(group["last_ms"], ts_ms)
         group["max_level"] = max(group["max_level"], _event_level(raw))
@@ -418,6 +445,7 @@ def build_snapshot() -> dict[str, Any]:
                 "ja4h": session.get("ja4h"),
                 "events": 0,
                 "stages": {int(session.get("highest_stage", 0) or 0)},
+                "decoys": set(),
                 "first_ms": _session_epoch_ms(session),
                 "last_ms": _session_epoch_ms(session),
                 "max_level": 0,
@@ -462,15 +490,12 @@ def build_snapshot() -> dict[str, Any]:
         protocols = ["tcp", "http"]
         if highest_stage >= 3:
             protocols.append("ssh")
-        touched: list[str] = []
-        if any(stage in (1, 2) for stage in stages) or highest_stage <= 2:
-            touched.append("web-decoy")
-        if highest_stage >= 3:
-            touched.append("cowrie-ssh")
-        if highest_stage >= 4:
-            touched.append("vault-decoy")
+        # Only the decoys this attacker actually reached, in a stable order.
+        touched = [name for name in DECOY_ORDER if name in group["decoys"]]
         if not touched:
-            touched = ["web-decoy"]
+            touched = [_resolve_target(highest_stage)[1]]
+        if "cowrie-ssh" in touched and "ssh" not in protocols:
+            protocols.append("ssh")
 
         nodes.append(
             {
@@ -528,7 +553,7 @@ def build_snapshot() -> dict[str, Any]:
         wazuh = raw.get("wazuh", {}) or {}
         level = int(wazuh.get("level", 0) or 0)
         stage = _event_stage(raw)
-        destination_id, destination = _stage_target(stage)
+        destination_id, destination = _resolve_target(stage, _event_endpoint(raw))
         destination_ip = next(
             (hp["ip"] for hp in HONEYPOTS if hp["id"] == destination_id),
             "10.0.4.22",
@@ -541,7 +566,7 @@ def build_snapshot() -> dict[str, Any]:
                 "sourceIp": attacker.get("ip", "185.220.101.4"),
                 "destination": destination,
                 "destinationIp": destination_ip,
-                "protocol": "ssh" if stage == 3 else "http",
+                "protocol": "ssh" if destination_id == "hp-cowrie" else "http",
                 "eventType": action.get("title", "SOC_TELEMETRY"),
                 "description": wazuh.get(
                     "description", action.get("title", "Telemetry Event")

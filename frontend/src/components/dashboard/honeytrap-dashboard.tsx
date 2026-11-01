@@ -139,24 +139,31 @@ const STAGE_HONEYPOT: Record<number, { id: string; name: string }> = {
   4: { id: 'hp-vault', name: 'vault-decoy' },
 };
 
+// Endpoint hints win over the stage default, because polymorphic personas route
+// the same stage through different decoys (Morph-v2.0 sends stage 2 to the
+// GraphQL debug gateway and stage 4 to the object-storage vault).
+const ENDPOINT_HONEYPOT: Array<{
+  needle: string;
+  target: { id: string; name: string };
+}> = [
+  { needle: 'graphql', target: { id: 'hp-graphql', name: 'graphql-decoy' } },
+  { needle: 'treasury', target: { id: 'hp-vault', name: 'vault-decoy' } },
+  { needle: '/s3/', target: { id: 'hp-vault', name: 'vault-decoy' } },
+  { needle: 'vault', target: { id: 'hp-vault', name: 'vault-decoy' } },
+  { needle: 'ledger', target: { id: 'hp-vault', name: 'vault-decoy' } },
+  { needle: 'etcd', target: { id: 'hp-vault', name: 'vault-decoy' } },
+  { needle: 'shell', target: { id: 'hp-cowrie', name: 'cowrie-ssh' } },
+  { needle: 'ssh', target: { id: 'hp-cowrie', name: 'cowrie-ssh' } },
+  { needle: 'cowrie', target: { id: 'hp-cowrie', name: 'cowrie-ssh' } },
+];
+
 const resolveStageHoneypot = (stage: any, endpoint?: string) => {
-  const numeric = Number(stage);
-  if (STAGE_HONEYPOT[numeric]) return STAGE_HONEYPOT[numeric];
   const haystack = String(endpoint || '').toLowerCase();
-  if (haystack.includes('vault') || haystack.includes('ledger')) {
-    return { id: 'hp-vault', name: 'vault-decoy' };
+  for (const entry of ENDPOINT_HONEYPOT) {
+    if (haystack.includes(entry.needle)) return entry.target;
   }
-  if (haystack.includes('graphql')) {
-    return { id: 'hp-graphql', name: 'graphql-decoy' };
-  }
-  if (
-    haystack.includes('shell') ||
-    haystack.includes('ssh') ||
-    haystack.includes('cowrie')
-  ) {
-    return { id: 'hp-cowrie', name: 'cowrie-ssh' };
-  }
-  return { id: 'hp-web', name: 'web-decoy' };
+  const numeric = Number(stage);
+  return STAGE_HONEYPOT[numeric] || { id: 'hp-web', name: 'web-decoy' };
 };
 
 const TOKENS = {
@@ -2382,7 +2389,7 @@ export default function App({
             const target = resolveStageHoneypot(stage, endpoint);
             const sev = (wazuh.level >= 13 || payload.severity === 'critical') ? 'critical' : 'high';
             const title = actionInfo.title || payload.intent_summary || payload.description || `Wazuh Rule ${wazuh.ruleId || payload.wazuh_rule || '100501'} Ingested`;
-            const protocol = stage === 3 ? 'SSH' : 'HTTP';
+            const protocol = target.id === 'hp-cowrie' ? 'SSH' : 'HTTP';
 
             appendEvent({
               id: payload.eventId || `evt-${Date.now()}`,

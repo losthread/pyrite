@@ -24,16 +24,25 @@ const STAGE_HONEYPOT: Record<number, string> = {
   4: "vault-decoy",
 }
 
+const ENDPOINT_HONEYPOT: Array<{ needle: string; name: string }> = [
+  { needle: "graphql", name: "graphql-decoy" },
+  { needle: "treasury", name: "vault-decoy" },
+  { needle: "/s3/", name: "vault-decoy" },
+  { needle: "vault", name: "vault-decoy" },
+  { needle: "ledger", name: "vault-decoy" },
+  { needle: "etcd", name: "vault-decoy" },
+  { needle: "shell", name: "cowrie-ssh" },
+  { needle: "ssh", name: "cowrie-ssh" },
+  { needle: "cowrie", name: "cowrie-ssh" },
+]
+
 function resolveHoneypotName(stage: any, endpoint?: string) {
-  const numeric = Number(stage)
-  if (STAGE_HONEYPOT[numeric]) return STAGE_HONEYPOT[numeric]
   const haystack = String(endpoint || "").toLowerCase()
-  if (haystack.includes("vault") || haystack.includes("ledger")) return "vault-decoy"
-  if (haystack.includes("graphql")) return "graphql-decoy"
-  if (haystack.includes("shell") || haystack.includes("ssh") || haystack.includes("cowrie")) {
-    return "cowrie-ssh"
+  for (const entry of ENDPOINT_HONEYPOT) {
+    if (haystack.includes(entry.needle)) return entry.name
   }
-  return "web-decoy"
+  const numeric = Number(stage)
+  return STAGE_HONEYPOT[numeric] || "web-decoy"
 }
 
 export interface PyriteTelemetryValue {
@@ -167,7 +176,7 @@ export function PyriteTelemetryProvider({
               sourceIp: attackerInfo.ip || "185.220.101.4",
               destination: honeypotName,
               destinationIp: "10.0.4.21",
-              protocol: stage === 3 ? "SSH" : "HTTP",
+              protocol: honeypotName === "cowrie-ssh" ? "SSH" : "HTTP",
               eventType: eventPayload.title || "active_deception_trap",
               description: wazuhRule.description || eventPayload.title || "Deception event recorded",
               ruleId: String(wazuhRule.ruleId || "100501"),
