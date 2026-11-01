@@ -307,20 +307,30 @@ function AttackerDetail({
 }) {
   return (
     <div className="p-3">
-      <div className="flex items-center justify-between border-b border-ink/10 pb-3">
-        <div>
-          <p className="font-mono text-[9px] text-muted-ink">{attacker.ja4h}</p>
-          <p className="mt-1 text-[12px]">{attacker.status}</p>
+      <div className="border-b border-ink/10 pb-3">
+        <div className="flex items-center justify-between">
+          <p className="font-mono text-[9px] tracking-[0.08em] text-muted-ink uppercase">
+            Status
+          </p>
+          <SeverityDot severity={attacker.severity} />
         </div>
-        <SeverityDot severity={attacker.severity} />
+        <p className="mt-1 text-[12px] capitalize">{attacker.status}</p>
+        <p className="mt-2 font-mono text-[9px] tracking-[0.08em] text-muted-ink uppercase">
+          JA4H fingerprint
+        </p>
+        <p className="mt-1 break-all font-mono text-[9px] text-muted-ink">
+          {attacker.ja4h || "not captured"}
+        </p>
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3">
         {[
+          ["Severity", String(attacker.severity).toUpperCase()],
           ["Attempts", attacker.attempts.toLocaleString()],
           ["Last seen", formatRelative(attacker.lastSeen)],
-          ["First seen", formatDate(attacker.firstSeen)],
+          ["First seen", `${formatDate(attacker.firstSeen)} ${formatTime(attacker.firstSeen)} UTC`],
           ["Protocols", attacker.protocols.join(", ")],
+          ["Honeypots hit", String(attacker.honeypots.length)],
         ].map(([label, value]) => (
           <div key={label}>
             <dt className="font-mono text-[9px] tracking-[0.08em] text-muted-ink uppercase">
