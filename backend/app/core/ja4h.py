@@ -18,6 +18,28 @@ ALLOW_SIM_OVERRIDE = os.getenv("VYUH_ALLOW_SIM_OVERRIDE", "true").lower() in {
     "yes",
 }
 
+# Headers excluded from the header-order signature. Ephemeral auth/token and
+# body/encoding headers change between trap stages (X-Debug-Token on stage 2,
+# Authorization on stage 3, X-Vault-Key on stage 4) and must not alter the
+# attacker's JA4H, otherwise a legitimate same-client progression is misread as
+# syndicate token sharing.
+_EXCLUDED_HEADER_ORDER = {
+    "x-forwarded-for",
+    "x-real-ip",
+    "host",
+    "connection",
+    "authorization",
+    "x-debug-token",
+    "x-ssh-token",
+    "x-vault-key",
+    "x-client-fingerprint",
+    "cookie",
+    "content-length",
+    "content-type",
+    "transfer-encoding",
+    "accept-encoding",
+}
+
 
 def extract_client_identity(request: Request) -> Dict[str, Any]:
     """
@@ -56,12 +78,12 @@ def extract_client_identity(request: Request) -> Dict[str, Any]:
     if hasattr(request, "headers") and hasattr(request.headers, "raw"):
         for name_bytes, _ in request.headers.raw:
             h_name = name_bytes.decode("latin1", errors="ignore").lower()
-            if h_name not in ["x-forwarded-for", "x-real-ip", "host", "connection"]:
+            if h_name not in _EXCLUDED_HEADER_ORDER:
                 raw_header_keys.append(h_name)
     else:
         for k in request.headers.keys():
             k_lower = k.lower()
-            if k_lower not in ["x-forwarded-for", "x-real-ip", "host", "connection"]:
+            if k_lower not in _EXCLUDED_HEADER_ORDER:
                 raw_header_keys.append(k_lower)
 
     header_order_sig = ",".join(raw_header_keys[:10])
