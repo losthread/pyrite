@@ -663,6 +663,40 @@ function AnimatedMetric({ value, reducedMotion }) {
 // Honeypot Hexagon, Protected Server Shielded Square, Normal Gateway Circle)
 // plus clickable nodes AND clickable connection edges.
 // ============================================================================
+
+// ============================================================================
+// HONEYPOT NODE RESOLVER: Maps endpoint/stage to actual honeypot on graph
+// ============================================================================
+function resolveHoneypotId(dest: any): string {
+  if (!dest) return 'honeypot-ssh-01';
+  const d = String(dest).toLowerCase();
+  if (d.includes('postgres') || d.includes('pg') || d.includes('legacy-query') || d.includes('5432') || d.includes('sql')) {
+    return 'honeypot-postgres-05';
+  }
+  if (d.includes('http') || d.includes('git') || d.includes('env') || d.includes('graphql') || d.includes('443') || d.includes('web')) {
+    return 'honeypot-http-02';
+  }
+  if (d.includes('ssh') || d.includes('shell') || d.includes('jumpbox') || d.includes('22')) {
+    return 'honeypot-ssh-01';
+  }
+  if (d.includes('redis') || d.includes('6379')) {
+    return 'honeypot-redis-03';
+  }
+  if (d.includes('ics') || d.includes('modbus') || d.includes('scada') || d.includes('502')) {
+    return 'honeypot-ics-04';
+  }
+  if (d.includes('telnet') || d.includes('busybox') || d.includes('23')) {
+    return 'honeypot-telnet-06';
+  }
+  if (d.includes('mqtt') || d.includes('1883')) {
+    return 'honeypot-mqtt-07';
+  }
+  if (d.includes('vault') || d.includes('s3') || d.includes('export') || d.includes('treasury')) {
+    return 'honeypot-vault-08';
+  }
+  return 'honeypot-ssh-01';
+}
+
 function NetworkTopologyCanvas({
   infraNodes,
   honeypots,
@@ -808,36 +842,34 @@ function NetworkTopologyCanvas({
       });
     }
 
-    // Attacker -> Honeypot connections
+    // Attacker -> Honeypot connections: Always connects to the exact honeypot currently targeted!
     filteredAttackers.forEach((att) => {
-      att.targetedHoneypots.forEach((hpId) => {
-        const hpExists = filteredHoneypots.some((h) => h.id === hpId);
-        if (!hpExists) return;
-        const isContained = att.status === 'Contained';
-        const isHighThreat =
-          att.severity === 'critical' ||
-          att.severity === 'high' ||
-          att.status === 'Malicious' ||
-          att.status === 'Suspicious';
+      const rawTarget = att.currentTargetHoneypot || (att.targetedHoneypots && att.targetedHoneypots[0]) || 'honeypot-ssh-01';
+      const targetHp = resolveHoneypotId(rawTarget);
+      const isContained = att.status === 'Contained';
+      const isHighThreat =
+        att.severity === 'critical' ||
+        att.severity === 'high' ||
+        att.status === 'Malicious' ||
+        att.status === 'Suspicious';
 
-        list.push({
-          id: `edge-${att.id}-${hpId}`,
-          sourceId: att.id,
-          targetId: hpId,
-          sourceLabel: att.ip,
-          targetLabel: hpId,
-          edgeType: isContained
-            ? 'historical'
-            : isHighThreat
-            ? 'malicious'
-            : 'normal',
-          protocol: att.protocols.join(' / '),
-          status: isContained
-            ? 'Isolated in MicroVM Cage'
-            : `${att.attackType}`,
-          packetRate: isContained ? '0 pkt/s (Blocked)' : `${att.attempts} frames`,
-          attacker: att,
-        });
+      list.push({
+        id: `edge-${att.id}-${targetHp}`,
+        sourceId: att.id,
+        targetId: targetHp,
+        sourceLabel: att.ip,
+        targetLabel: targetHp,
+        edgeType: isContained
+          ? 'historical'
+          : isHighThreat
+          ? 'malicious'
+          : 'normal',
+        protocol: (att.protocols && att.protocols.join(' / ')) || 'TCP',
+        status: isContained
+          ? 'Isolated in MicroVM Cage (504 WAF Exit)'
+          : `${att.attackType} → ${targetHp}`,
+        packetRate: isContained ? '0 pkt/s (Blocked)' : `${att.attempts} frames`,
+        attacker: att,
       });
     });
 
@@ -1723,7 +1755,7 @@ function EntityInspectorPanel({
             {copied ? 'COPIED' : 'COPY IDENTIFIER'}
           </button>
         )}
-        {kind === 'ATTACKER' && data.status !== 'Contained' && !isLiveMode && (
+        {kind === 'ATTACKER' && data.status !== 'Contained' && (
           <button
             onClick={() => onContainAttacker(data)}
             className="flex-1 py-1.5 px-2 bg-[#FF493D] text-[#0B0B0C] hover:bg-[#F1EFE9] uppercase text-[9.5px] font-bold flex items-center justify-center gap-1"
@@ -2021,6 +2053,12 @@ export default function App({
       // Discard sessions older than 5 minutes (300 seconds)
       if (now - lastSeenMs > 300000) return;
 
+      const targetHp = resolveHoneypotId(s.last_honeypot || (
+        s.highest_stage === 4 ? 'honeypot-vault-08' :
+        s.highest_stage === 3 ? 'honeypot-ssh-01' :
+        s.highest_stage === 2 ? 'honeypot-postgres-05' : 'honeypot-http-02'
+      ));
+
       if (!grouped.has(ip)) {
         grouped.set(ip, {
           ip,
@@ -2033,7 +2071,8 @@ export default function App({
           lastSeen: s.last_seen || 'Active',
           lastSeenTs: lastSeenMs,
           ja4h: s.ja4h,
-          targetedHoneypots: ['honeypot-ssh-01'],
+          currentTargetHoneypot: targetHp,
+          targetedHoneypots: [targetHp],
         });
       }
       const item = grouped.get(ip)!;
@@ -2044,6 +2083,10 @@ export default function App({
       item.lastSeenTs = Math.max(item.lastSeenTs, lastSeenMs);
       if (s.plausible_waf_drop) item.plausibleWafDrop = true;
       if (s.prod_correlated) item.prodCorrelated = true;
+      item.currentTargetHoneypot = targetHp;
+      if (!item.targetedHoneypots.includes(targetHp)) {
+        item.targetedHoneypots.push(targetHp);
+      }
     });
 
     const result: any[] = [];
@@ -2069,6 +2112,7 @@ export default function App({
         lastSeen: 'Active',
         lastSeenTs: g.lastSeenTs,
         attempts: g.attempts,
+        currentTargetHoneypot: g.currentTargetHoneypot || (g.targetedHoneypots && g.targetedHoneypots[0]) || "honeypot-ssh-01",
         targetedHoneypots: g.targetedHoneypots,
         protocols: ['TCP', 'SSH'],
         ports: [8000, 22],
@@ -2219,7 +2263,8 @@ export default function App({
                         attempts: a.attempts + 1,
                         lastSeen: currentTime,
                         lastSeenTs: Date.now(),
-                        targetedHoneypots: Array.from(new Set([...a.targetedHoneypots, endpoint])),
+                        currentTargetHoneypot: resolveHoneypotId(endpoint),
+                        targetedHoneypots: Array.from(new Set([...a.targetedHoneypots, resolveHoneypotId(endpoint)])),
                         severity: sev,
                         threatScore: Math.min(100, (a.threatScore || 70) + 5),
                       }
@@ -2236,7 +2281,8 @@ export default function App({
                 lastSeen: 'Active',
                 lastSeenTs: Date.now(),
                 attempts: 1,
-                targetedHoneypots: [endpoint],
+                currentTargetHoneypot: resolveHoneypotId(endpoint),
+                targetedHoneypots: [resolveHoneypotId(endpoint)],
                 protocols: ['TCP'],
                 ports: [8000],
                 severity: sev,
@@ -2254,8 +2300,13 @@ export default function App({
           } else if (msgType === 'topology_mutated') {
             setStatusBanner({
               level: 'info',
-              text: `TOPOLOGY MUTATION APPLIED: Seed rotated to ${payload.new_seed || 'Morph-v2.0'}`,
+              text: `🧬 POLYMORPHISM: Active seed mutated to ${payload.new_seed || 'Morph-v2.0'} · Previous breadcrumbs burned`,
             });
+            // Visually rotate honeypot coordinates to show polymorphic shift
+            setHoneypots((prev) => prev.map((hp, idx) => {
+              const angle = (idx * (360 / prev.length) + 20) * (Math.PI / 180);
+              return { ...hp, x: Math.round(155 * Math.sin(angle)), y: Math.round(-155 * Math.cos(angle)) };
+            }));
           } else if (msgType === 'tarpit_progress') {
             setStatusBanner({
               level: 'critical',

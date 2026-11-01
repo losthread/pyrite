@@ -303,55 +303,30 @@ class SocWebSocketManager:
 
         elif action == "PLAUSIBLE_WAF_DROP":
             target = ja4h or (get_all_shadow_worlds()[0]["ja4h"] if get_all_shadow_worlds() else None)
+            target_ip = payload.get("ip")
             if target:
                 quarantine_attacker(target, True)
-                await self.broadcast("action_ack", {
-                    "action": "PLAUSIBLE_WAF_DROP",
-                    "targetJa4h": target,
-                    "status": "SUCCESS",
-                    "message": "Attacker quarantined via Plausible Failure Exit (HTTP 504 Gateway Timeout)."
-                })
+            if target_ip:
+                from app.core.shadow_world import shadow_worlds, quarantine_ip
+                quarantine_ip(target_ip, True)
+                for s in shadow_worlds.values():
+                    if s.get("current_ip") == target_ip or s.get("initial_ip") == target_ip:
+                        s["plausible_waf_drop"] = True
+            await self.broadcast("action_ack", {
+                "action": "PLAUSIBLE_WAF_DROP",
+                "targetJa4h": target,
+                "targetIp": target_ip,
+                "status": "SUCCESS",
+                "message": f"Attacker {target_ip or target or 'Session'} quarantined via Plausible Failure Exit (HTTP 504 Gateway Timeout)."
+            })
 
         elif action == "MUTATE_TOPOLOGY":
             mutation = mutate_topology()
-            await self.broadcast("topology_mutated", mutation)
-            # High-priority mutation telemetry
-            mut_event = {
-                "eventId": f"evt_{int(time.time()*1000)}_sys",
-                "timestamp": time.strftime("%H:%M:%S") + f".{int(time.time() * 1000) % 1000:03d}",
-                "stage": 0,
-                "attacker": {
-                    "ip": "SYSTEM_INTERNAL",
-                    "ja4h": "0000000000000000",
-                    "ipChanged": False,
-                    "tokenShared": False,
-                    "topologyMutated": True,
-                    "prodCorrelated": False
-                },
-                "action": {
-                    "title": f"Polymorphic Topology Rotated to {mutation['new_seed']}",
-                    "endpoint": "/system/mutate",
-                    "rawPayload": f"Previous: {mutation['previous_seed']} -> New: {mutation['new_seed']}",
-                    "crumbMinted": None,
-                    "crumbUsed": None
-                },
-                "wazuh": {
-                    "ruleId": 100506,
-                    "level": 14,
-                    "severity": "HIGH",
-                    "description": f"Topology rotated to {mutation['new_seed']}; stale breadcrumbs burned",
-                    "mitreAttack": {"id": "M1049", "name": "Deception Controls"},
-                    "mitreEngage": {"id": "EAC0021", "name": "Dynamically Alter Environment"}
-                },
-                "metrics": {
-                    "threatScore": 0,
-                    "dwellTimeSeconds": 0,
-                    "polymorphicSeed": mutation["new_seed"]
-                }
-            }
-            write_deception_log(mut_event)
-            persist_telemetry_event(mut_event)
-            await self.broadcast("soc_telemetry", mut_event)
+            # Polymorphic rotation broadcast without fabricating an adversary attack event
+            await self.broadcast("topology_mutated", {
+                **mutation,
+                "message": f"Polymorphic shift applied: active persona rotated to {mutation['new_seed']}."
+            })
 
         elif action == "SIMULATE_STAGE":
             sim_ja4h = ja4h or "9f8e2b1c4a7d0031"

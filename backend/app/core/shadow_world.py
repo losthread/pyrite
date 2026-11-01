@@ -51,6 +51,16 @@ SESSION_TTL_SECONDS = 300
 
 # In-Memory Session Store: ja4h -> dict
 shadow_worlds: Dict[str, Dict[str, Any]] = {}
+quarantined_ips: set[str] = set()
+
+def is_ip_quarantined(ip: str) -> bool:
+    return ip in quarantined_ips
+
+def quarantine_ip(ip: str, state: bool = True) -> None:
+    if state:
+        quarantined_ips.add(ip)
+    else:
+        quarantined_ips.discard(ip)
 
 def clear_all_shadow_worlds() -> None:
     """Clears all in-memory shadow world adversary sessions."""
@@ -158,7 +168,7 @@ def get_or_create_shadow_world(ja4h: str, ip: str) -> Dict[str, Any]:
             "threat_score": 35 if prod_corr else 15,
             "highest_stage": 0,
             "prod_correlated": prod_corr,
-            "plausible_waf_drop": False,
+            "plausible_waf_drop": is_ip_quarantined(ip),
             "tarpit_active": False,
             "tarpit_speed": 512,      # bytes per chunk
             "tarpit_interval": 0.8,   # seconds
@@ -238,6 +248,7 @@ def get_all_shadow_worlds(active_only: bool = True) -> List[Dict[str, Any]]:
             "dwell_time_seconds": int(now - s["created_at"]),
             "threat_score": s["threat_score"],
             "highest_stage": s["highest_stage"],
+            "last_honeypot": s.get("last_honeypot", "honeypot-postgres-05" if s["highest_stage"] == 2 else ("honeypot-ssh-01" if s["highest_stage"] == 3 else ("honeypot-vault-08" if s["highest_stage"] == 4 else "honeypot-http-02"))),
             "prod_correlated": s["prod_correlated"],
             "plausible_waf_drop": s["plausible_waf_drop"],
             "tarpit_active": s["tarpit_active"],

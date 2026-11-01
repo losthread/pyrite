@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ArrowUpDown, Search, X } from "lucide-react"
+import { ArrowUpDown, Search, X, ShieldAlert } from "lucide-react"
 
 import { DemoControls } from "@/components/dashboard/demo-controls"
 import {
@@ -361,6 +361,17 @@ function AttackerDetail({
             </li>
           ) : null}
         </ul>
+      </div>
+
+      <div className="mt-4 border-t border-ink/10 pt-3">
+        <button
+          onClick={handleQuarantine}
+          disabled={attacker.status === "contained" || containedSuccess}
+          className="w-full flex items-center justify-center gap-1.5 border border-red-500/60 bg-red-950/40 text-red-400 px-3 py-2 font-mono text-[10px] font-bold uppercase hover:bg-red-900/60 transition-colors disabled:opacity-50"
+        >
+          <ShieldAlert className="size-3.5 text-red-500" />
+          <span>{attacker.status === "contained" || containedSuccess ? "Contained (504 WAF Exit Active)" : "Quarantine Attacker (504 WAF Exit)"}</span>
+        </button>
       </div>
     </div>
   )

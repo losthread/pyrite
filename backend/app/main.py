@@ -10,7 +10,7 @@ import random
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 import uvicorn
@@ -145,6 +145,68 @@ async def soc_websocket_endpoint(websocket: WebSocket):
         print(f"[!] [SOC WS EXCEPTION] {e}")
         ws_manager.disconnect(websocket)
 
+
+
+# ==============================================================================
+# Dynamic Reconnaissance Scanner 404 Honeytrap Catch-All
+# ==============================================================================
+@app.exception_handler(404)
+async def custom_404_honeypot_handler(request: Request, exc):
+    path = request.url.path
+    if path.startswith("/_next") or path == "/favicon.ico":
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+    from app.core.ja4h import extract_client_identity
+    from app.core.shadow_world import get_or_create_shadow_world, update_threat_score, get_active_topology
+    from app.stages.routes import emit_telemetry_event
+
+    client = extract_client_identity(request)
+    ja4h, ip = client["ja4h"], client["ip"]
+    sw = get_or_create_shadow_world(ja4h, ip)
+    session = sw["session"]
+    session["highest_stage"] = max(session["highest_stage"], 1)
+    update_threat_score(ja4h, 10)
+
+    p = path.lower()
+    if any(k in p for k in ["sql", "db", "pg", "query"]):
+        target_hp = "honeypot-postgres-05"
+    elif any(k in p for k in ["ssh", "shell", "exec"]):
+        target_hp = "honeypot-ssh-01"
+    elif "redis" in p:
+        target_hp = "honeypot-redis-03"
+    elif any(k in p for k in ["modbus", "plc", "s7", "ics"]):
+        target_hp = "honeypot-ics-04"
+    elif "telnet" in p:
+        target_hp = "honeypot-telnet-06"
+    elif "mqtt" in p:
+        target_hp = "honeypot-mqtt-07"
+    elif any(k in p for k in ["vault", "s3", "key"]):
+        target_hp = "honeypot-vault-08"
+    else:
+        target_hp = "honeypot-http-02"
+    session["last_honeypot"] = target_hp
+
+    await emit_telemetry_event(
+        stage=1,
+        ip=ip,
+        ja4h=ja4h,
+        ip_changed=sw["ip_changed"],
+        token_shared=False,
+        topology_mutated=False,
+        prod_correlated=sw["prod_correlated"],
+        title=f"Adversary Reconnaissance Scan: {path}",
+        endpoint=target_hp,
+        raw_payload=f"{request.method} {path}",
+        crumb_minted=None,
+        crumb_used=None,
+        threat_score=session["threat_score"],
+        dwell_time_seconds=int(time.time() - session["created_at"]),
+        polymorphic_seed=get_active_topology()["seed_id"]
+    )
+    return JSONResponse(
+        status_code=404,
+        content={"error": "Not Found", "message": f"Resource {path} not found on origin server.", "code": "RESOURCE_404"}
+    )
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False)

@@ -119,7 +119,8 @@ async def emit_telemetry_event(
 
 def check_plausible_waf_drop(session: Dict[str, Any], ip: str) -> Optional[Response]:
     """Returns a realistic AWS WAF / Cloudflare HTTP 504 Gateway Timeout if quarantined."""
-    if session and session.get("plausible_waf_drop"):
+    from app.core.shadow_world import is_ip_quarantined
+    if (session and session.get("plausible_waf_drop")) or is_ip_quarantined(ip):
         ray_id = os.urandom(8).hex()
         return JSONResponse(
             status_code=504,
@@ -153,6 +154,7 @@ async def handle_stage_1(request: Request):
     seed_id = topology["seed_id"]
 
     session["highest_stage"] = max(session["highest_stage"], 1)
+    session["last_honeypot"] = "honeypot-http-02"
     update_threat_score(ja4h, 15)
 
     crumb1 = mint_crumb(1, ja4h, seed_id)
@@ -168,7 +170,7 @@ async def handle_stage_1(request: Request):
         topology_mutated=False,
         prod_correlated=sw["prod_correlated"],
         title="Stage 1 Recon Probe Leaked Breadcrumb",
-        endpoint=str(request.url.path),
+        endpoint="honeypot-http-02",
         raw_payload=f"{request.method} {request.url.path}",
         crumb_minted=crumb1,
         crumb_used=None,
@@ -268,7 +270,7 @@ async def handle_stage_2(request: Request):
             topology_mutated=verify_res["topology_mutated"],
             prod_correlated=sw["prod_correlated"],
             title="Stage 2 SQLi Syntax Error Triggered (Ego Boost)",
-            endpoint=str(request.url.path),
+            endpoint="honeypot-postgres-05",
             raw_payload=query,
             crumb_minted=None,
             crumb_used=token,
@@ -299,7 +301,7 @@ async def handle_stage_2(request: Request):
             topology_mutated=verify_res["topology_mutated"],
             prod_correlated=sw["prod_correlated"],
             title="Stage 2 HoneyPatch Session Fork Triggered",
-            endpoint=str(request.url.path),
+            endpoint="honeypot-postgres-05",
             raw_payload=query or "UNION SELECT * FROM devops_service_accounts",
             crumb_minted=crumb2,
             crumb_used=token,
@@ -338,6 +340,25 @@ async def handle_stage_2(request: Request):
                 "warning": "INTERNAL_DEBUG_UNFILTERED: Unsanitized input delivered to query executor."
             }
         )
+
+    # 3. Generic DB Probe (Always emit telemetry so any query appears on the SOC grid)
+    await emit_telemetry_event(
+        stage=2,
+        ip=ip,
+        ja4h=ja4h,
+        ip_changed=sw["ip_changed"],
+        token_shared=verify_res["token_shared"],
+        topology_mutated=verify_res["topology_mutated"],
+        prod_correlated=sw["prod_correlated"],
+        title="Stage 2 Database Query Interaction",
+        endpoint="honeypot-postgres-05",
+        raw_payload=query or f"{request.method} {request.url.path}",
+        crumb_minted=crumb2,
+        crumb_used=token,
+        threat_score=max(session["threat_score"], 45),
+        dwell_time_seconds=dwell,
+        polymorphic_seed=seed_id
+    )
 
     return JSONResponse(
         status_code=200,
@@ -386,6 +407,23 @@ async def handle_stage_3(request: Request):
 
     verify_res = verify_crumb(token, ja4h, seed_id)
     if not verify_res["valid"] or verify_res.get("expired"):
+        await emit_telemetry_event(
+            stage=3,
+            ip=ip,
+            ja4h=ja4h,
+            ip_changed=sw["ip_changed"],
+            token_shared=verify_res["token_shared"],
+            topology_mutated=verify_res["topology_mutated"],
+            prod_correlated=sw["prod_correlated"],
+            title=f"Stage 3 Unauthorized Shell Probe ({command or 'ssh probe'})",
+            endpoint="honeypot-ssh-01",
+            raw_payload=command or "UNAUTHORIZED_EXEC_PROBE",
+            crumb_minted=None,
+            crumb_used=token,
+            threat_score=max(session["threat_score"], 65),
+            dwell_time_seconds=int(time.time() - session["created_at"]),
+            polymorphic_seed=seed_id
+        )
         return JSONResponse(
             status_code=401,
             content={
@@ -628,3 +666,86 @@ async def receive_wazuh_webhook(request: Request):
         return {"status": "INGESTED"}
     except Exception as e:
         return {"status": "ERROR", "message": str(e)}
+
+# ==============================================================================
+# ATTACK-SPECIFIC QUARANTINE REST API
+# ==============================================================================
+@router.post("/api/quarantine")
+async def quarantine_specific_attack(payload: Dict[str, Any] = Body(...)):
+    ip = payload.get("ip")
+    ja4h = payload.get("ja4h")
+    from app.core.shadow_world import shadow_worlds, quarantine_attacker
+    contained_count = 0
+    if ja4h:
+        quarantine_attacker(ja4h, True)
+        contained_count += 1
+    if ip:
+        from app.core.shadow_world import quarantine_ip
+        quarantine_ip(ip, True)
+        for s in shadow_worlds.values():
+            if s.get("current_ip") == ip or s.get("initial_ip") == ip:
+                s["plausible_waf_drop"] = True
+                contained_count += 1
+    await ws_manager.broadcast("action_ack", {
+        "action": "PLAUSIBLE_WAF_DROP",
+        "targetIp": ip,
+        "targetJa4h": ja4h,
+        "status": "SUCCESS",
+        "message": f"Attacker {ip or ja4h} quarantined. HTTP 504 WAF Exit active."
+    })
+    return {"status": "CONTAINED", "ip": ip, "ja4h": ja4h, "sessions_contained": contained_count}
+
+
+# ==============================================================================
+# CANARY DECOY CATCH-ALL ROUTE
+# Captures any scanners/probes to .env, .git, admin, php, actuator, etc.
+# ==============================================================================
+@router.api_route("/decoy/{full_path:path}", methods=["GET", "POST", "PUT"])
+@router.api_route("/admin{full_path:path}", methods=["GET", "POST"])
+@router.api_route("/wp-{full_path:path}", methods=["GET", "POST"])
+@router.api_route("/actuator{full_path:path}", methods=["GET", "POST"])
+async def handle_generic_decoy_probe(request: Request, full_path: str = ""):
+    client = extract_client_identity(request)
+    ja4h, ip = client["ja4h"], client["ip"]
+    sw = get_or_create_shadow_world(ja4h, ip)
+    session = sw["session"]
+    session["highest_stage"] = max(session["highest_stage"], 1)
+    update_threat_score(ja4h, 20)
+
+    url_path = request.url.path
+    if "admin" in url_path or "wp-" in url_path or "actuator" in url_path:
+        hp_target = "honeypot-http-02"
+    elif "sql" in url_path or "db" in url_path or "query" in url_path:
+        hp_target = "honeypot-postgres-05"
+    elif "redis" in url_path:
+        hp_target = "honeypot-redis-03"
+    elif "plc" in url_path or "modbus" in url_path:
+        hp_target = "honeypot-ics-04"
+    elif "telnet" in url_path:
+        hp_target = "honeypot-telnet-06"
+    elif "mqtt" in url_path:
+        hp_target = "honeypot-mqtt-07"
+    elif "vault" in url_path or "s3" in url_path:
+        hp_target = "honeypot-vault-08"
+    else:
+        hp_target = "honeypot-http-02"
+
+    dwell = int(time.time() - session["created_at"])
+    await emit_telemetry_event(
+        stage=1,
+        ip=ip,
+        ja4h=ja4h,
+        ip_changed=sw["ip_changed"],
+        token_shared=False,
+        topology_mutated=False,
+        prod_correlated=sw["prod_correlated"],
+        title=f"Decoy Canary Probed: {url_path}",
+        endpoint=hp_target,
+        raw_payload=f"{request.method} {url_path}",
+        crumb_minted=None,
+        crumb_used=None,
+        threat_score=session["threat_score"],
+        dwell_time_seconds=dwell,
+        polymorphic_seed=get_active_topology()["seed_id"]
+    )
+    return JSONResponse(status_code=403, content={"error": "Access Denied", "node": hp_target})
