@@ -4,6 +4,13 @@ import * as React from "react"
 import { ShieldCheck, ShieldAlert, Lock, Key, Cpu, RefreshCw, Copy, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+function toBase64Url(str: string): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(str, "utf-8").toString("base64url")
+  }
+  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
 export function TokenAnatomyCard() {
   const [selectedSegment, setSelectedSegment] = React.useState<"prefix" | "payload" | "hmac">("payload")
   const [activeStage, setActiveStage] = React.useState<1 | 2 | 3>(1)
@@ -25,11 +32,7 @@ export function TokenAnatomyCard() {
   }, [activeStage])
 
   const payloadB64 = React.useMemo(() => {
-    const str = JSON.stringify(payloadData)
-    if (typeof window !== "undefined") {
-      return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
-    }
-    return "eyJzIjoxLCJmIjoiNWU3ZTY2Yzk5ZTliYjliMCIsInQiOjE3OTM0OTYzODUsInNlZWQiOiJNb3JwaC12MS4wIn0"
+    return toBase64Url(JSON.stringify(payloadData))
   }, [payloadData])
 
   const hmacSig = React.useMemo(() => {
@@ -164,7 +167,7 @@ export function TokenAnatomyCard() {
             {selectedSegment === "prefix" && (
               <div className="space-y-3 font-mono text-xs leading-relaxed text-[#9A9891]">
                 <p>
-                  <strong className="text-[#F1EFE9]">vk_live_</strong> stands for <em className="text-signal">Vyuha-Kernel Live Deception Token</em>.
+                  <strong className="text-[#F1EFE9]">vk_live_</strong> stands for <em className="text-signal">Pyrite-Kernel Live Deception Token</em>.
                 </p>
                 <p>
                   When inbound HTTP headers (<code className="text-[#F1EFE9]">X-Debug-Token</code>, <code className="text-[#F1EFE9]">X-Vault-Key</code>, or <code className="text-[#F1EFE9]">Authorization</code>) start with this prefix, FastAPI routes immediately invoke the strict HMAC verification pipeline before processing any business logic.
