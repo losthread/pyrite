@@ -75,6 +75,9 @@ export default function LiveDemoPage() {
   })
   const [actionBusy, setActionBusy] = useState(false)
   const [angleOffset, setAngleOffset] = useState(0)
+  const [probeStage, setProbeStage] = useState(1)
+  const [crumbs, setCrumbs] = useState<{ c1?: string; c2?: string; c3?: string }>({})
+  const [autoRunning, setAutoRunning] = useState(false)
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
@@ -282,25 +285,142 @@ export default function LiveDemoPage() {
     setActionBusy(false)
   }
 
+  const executeSingleStage = async (targetStage: number, currentCrumbs: { c1?: string; c2?: string; c3?: string }) => {
+    const apiBase = typeof window !== "undefined"
+      ? `${window.location.protocol}//${window.location.hostname || "localhost"}:8000`
+      : "http://localhost:8000"
+
+    const nextCrumbs = { ...currentCrumbs }
+
+    if (targetStage === 1) {
+      setBanner({
+        text: "⚡ STAGE 1: Reconnaissance Scan against exposed Git reflog (/.git/logs/HEAD)...",
+        tone: "info",
+      })
+      try {
+        const res = await fetch(`${apiBase}/.git/logs/HEAD`, {
+          headers: { "X-Forwarded-For": "185.220.101.4" },
+        })
+        const text = await res.text()
+        const match = text.match(/vk_live_[A-Za-z0-9_-]+\.[a-f0-9]{10}/)
+        if (match) {
+          nextCrumbs.c1 = match[0]
+        } else {
+          nextCrumbs.c1 = "vk_live_recon_stage1"
+        }
+        setCrumbs(nextCrumbs)
+        setProbeStage(2)
+        setBanner({
+          text: `⚡ STAGE 1 RECON COMPLETE: /.git/logs/HEAD accessed · Attacker harvested Breadcrumb #1 (${(nextCrumbs.c1 || "").slice(0, 16)}...)`,
+          tone: "info",
+        })
+      } catch {}
+    } else if (targetStage === 2) {
+      setBanner({
+        text: "⚡ STAGE 2: HoneyPatched SQL Injection against legacy database query endpoint...",
+        tone: "info",
+      })
+      try {
+        const res = await fetch(`${apiBase}/api/internal/legacy-query`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Debug-Token": nextCrumbs.c1 || "vk_live_recon_fallback",
+            "X-Forwarded-For": "185.220.101.4",
+          },
+          body: JSON.stringify({
+            query: "SELECT * FROM users WHERE id = '1' UNION SELECT * FROM devops_service_accounts --",
+            exploit: true,
+          }),
+        })
+        const data = await res.json()
+        const token = data?.results?.[0]?.ssh_auth_token
+        if (token) {
+          nextCrumbs.c2 = token
+        } else {
+          nextCrumbs.c2 = "vk_live_ssh_stage2"
+        }
+        setCrumbs(nextCrumbs)
+        setProbeStage(3)
+        setBanner({
+          text: `⚡ STAGE 2 SQLi FORK: Fake PostgreSQL records served · Attacker harvested Jumpbox SSH Key (${(nextCrumbs.c2 || "").slice(0, 16)}...)`,
+          tone: "info",
+        })
+      } catch {}
+    } else if (targetStage === 3) {
+      setBanner({
+        text: "⚡ STAGE 3: Accessing Virtual DevOps Jumpbox via SSH Bearer Token...",
+        tone: "info",
+      })
+      try {
+        const res = await fetch(`${apiBase}/api/shell/exec`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${nextCrumbs.c2 || "vk_live_ssh_stage2"}`,
+            "X-Forwarded-For": "185.220.101.4",
+          },
+          body: JSON.stringify({ command: "cat /opt/scripts/vault_sync.sh" }),
+        })
+        const data = await res.json()
+        const match = (data?.stdout || "").match(/vk_live_[A-Za-z0-9_-]+\.[a-f0-9]{10}/)
+        if (match) {
+          nextCrumbs.c3 = match[0]
+        } else {
+          nextCrumbs.c3 = "vk_live_vault_master"
+        }
+        setCrumbs(nextCrumbs)
+        setProbeStage(4)
+        setBanner({
+          text: `⚡ STAGE 3 JUMPBOX SHELL: Attacker ran 'cat vault_sync.sh' · Exposed Master Vault Key (${(nextCrumbs.c3 || "").slice(0, 16)}...)`,
+          tone: "info",
+        })
+      } catch {}
+    } else if (targetStage === 4) {
+      setBanner({
+        text: "🚨 STAGE 4 CRITICAL: Cold Storage Vault Exfiltration initiated with Stolen Master Key...",
+        tone: "critical",
+      })
+      try {
+        fetch(`${apiBase}/vault/v1/export`, {
+          headers: {
+            "X-Vault-Key": nextCrumbs.c3 || "vk_live_vault_master",
+            "X-Forwarded-For": "185.220.101.4",
+          },
+        }).catch(() => {})
+        setProbeStage(1)
+        setBanner({
+          text: "🚨 STAGE 4 CRITICAL: Vault Exfiltration trapped in Adaptive Streaming Tarpit! Threat Score 98 · Click [Quarantine (504 WAF)] to contain!",
+          tone: "critical",
+        })
+      } catch {}
+    }
+
+    setTimeout(fetchLiveBackend, 350)
+    return nextCrumbs
+  }
+
   const handleInjectProbe = async () => {
     setActionBusy(true)
-    setBanner({
-      text: "🚀 FIRING REAL HTTP PROBE: POST /api/internal/legacy-query · Awaiting live honeypot telemetry...",
-      tone: "info",
-    })
-    try {
-      const apiBase = typeof window !== "undefined"
-        ? `${window.location.protocol}//${window.location.hostname || "localhost"}:8000`
-        : "http://localhost:8000"
-
-      await fetch(`${apiBase}/api/internal/legacy-query`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: "SELECT * FROM devops_keys WHERE role = 'admin' --" }),
-      })
-      setTimeout(fetchLiveBackend, 300)
-    } catch {}
+    await executeSingleStage(probeStage, crumbs)
     setActionBusy(false)
+  }
+
+  const handleAutoRunFullAttack = async () => {
+    if (autoRunning) return
+    setAutoRunning(true)
+    setActionBusy(true)
+
+    let current = { ...crumbs }
+    for (let s = 1; s <= 4; s++) {
+      current = await executeSingleStage(s, current)
+      if (s < 4) {
+        await new Promise((r) => setTimeout(r, 1400))
+      }
+    }
+
+    setActionBusy(false)
+    setAutoRunning(false)
   }
 
   // 4. Group Sessions by IP
@@ -612,8 +732,17 @@ export default function LiveDemoPage() {
             onClick={handleInjectProbe}
             disabled={actionBusy}
             className="flex items-center gap-1 border border-[#F59E0B] bg-[#F59E0B]/20 text-[#F59E0B] px-3 py-1.5 font-bold uppercase hover:bg-[#F59E0B] hover:text-[#0A0A09] transition-all shadow-sm"
+            title="Step through individual attack stages (1 -> 2 -> 3 -> 4)"
           >
-            <span>🚀 Fire Live Attack Probe</span>
+            <span>🚀 Stage {probeStage}/4 Probe</span>
+          </button>
+          <button
+            onClick={handleAutoRunFullAttack}
+            disabled={actionBusy || autoRunning}
+            className="flex items-center gap-1 border border-[#22C55E] bg-[#22C55E]/20 text-[#22C55E] px-3 py-1.5 font-bold uppercase hover:bg-[#22C55E] hover:text-black transition-all shadow-sm"
+            title="Automatically run all 4 attack stages sequentially for pitch demonstration"
+          >
+            <span>{autoRunning ? "⏳ Running Attack..." : "▶ Auto-Run Full Attack"}</span>
           </button>
           <button
             onClick={() => handleQuarantine()}
@@ -845,3 +974,4 @@ export default function LiveDemoPage() {
     </div>
   )
 }
+
