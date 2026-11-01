@@ -78,6 +78,7 @@ export default function LiveDemoPage() {
   const [probeStage, setProbeStage] = useState(1)
   const [crumbs, setCrumbs] = useState<{ c1?: string; c2?: string; c3?: string }>({})
   const [autoRunning, setAutoRunning] = useState(false)
+  const [simulatedAttacker, setSimulatedAttacker] = useState<SessionData | null>(null)
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
@@ -224,6 +225,7 @@ export default function LiveDemoPage() {
     const ja4h = targetJa4h || sessions[0]?.ja4h
 
     // Optimistic UI update
+    setSimulatedAttacker((prev) => prev ? { ...prev, plausible_waf_drop: true, threat_score: 98 } : null)
     setSessions((prev) =>
       prev.map((s) => (s.current_ip === ip ? { ...s, plausible_waf_drop: true } : s))
     )
@@ -269,6 +271,7 @@ export default function LiveDemoPage() {
 
   const handleReset = async () => {
     setActionBusy(true)
+    setSimulatedAttacker(null)
     setSessions([])
     setEvents([])
     setSelectedEntity(null)
@@ -291,6 +294,40 @@ export default function LiveDemoPage() {
       : "http://localhost:8000"
 
     const nextCrumbs = { ...currentCrumbs }
+    const stageMap: Record<number, { hp: string; threat: number; title: string }> = {
+      1: { hp: "honeypot-http-02", threat: 35, title: "Reconnaissance Scan (/.git/logs/HEAD)" },
+      2: { hp: "honeypot-postgres-05", threat: 65, title: "HoneyPatched SQLi Fork (/api/internal/legacy-query)" },
+      3: { hp: "honeypot-ssh-01", threat: 85, title: "Interactive Jumpbox Shell Exec (cat vault_sync.sh)" },
+      4: { hp: "honeypot-vault-08", threat: 98, title: "Cold Vault Exfiltration (Tarpit Active)" },
+    }
+    const info = stageMap[targetStage] || stageMap[1]
+
+    setSimulatedAttacker({
+      ja4h: "t13d1516h2_8daaf6152771_b8f041e2b5e5",
+      current_ip: "185.220.101.4",
+      initial_ip: "185.220.101.4",
+      observed_ips: ["185.220.101.4"],
+      dwell_time_seconds: targetStage * 18,
+      threat_score: info.threat,
+      highest_stage: targetStage,
+      last_honeypot: info.hp,
+      prod_correlated: true,
+      plausible_waf_drop: false,
+      command_count: targetStage,
+      last_seen: new Date().toISOString(),
+    })
+
+    const newEvt: SecurityEvent = {
+      id: "live-sim-stage-" + targetStage + "-" + Date.now(),
+      timestamp: new Date().toISOString().slice(11, 19) + " UTC",
+      severity: targetStage >= 4 ? "critical" : targetStage >= 2 ? "suspicious" : "info",
+      source: "185.220.101.4",
+      destination: info.hp,
+      protocol: targetStage === 3 ? "SSH" : "HTTP/1.1",
+      title: "[STAGE " + targetStage + "/4] " + info.title,
+      mitre: targetStage === 4 ? "T1048" : targetStage === 3 ? "T1059" : targetStage === 2 ? "T1190" : "T1595",
+    }
+    setEvents((prev) => [newEvt, ...prev])
 
     if (targetStage === 1) {
       setBanner({
@@ -438,7 +475,7 @@ export default function LiveDemoPage() {
       }
     })
     return Array.from(map.values())
-  }, [sessions])
+  }, [sessions, simulatedAttacker])
 
   // 5. Interactive HTML5 Topology Canvas
   useEffect(() => {
@@ -653,7 +690,7 @@ export default function LiveDemoPage() {
           ctx.font = "bold 8.5px monospace"
           ctx.fillStyle = "#FF493D"
           ctx.textAlign = "center"
-          ctx.fillText("! INTRUSION", ax, ay - 18)
+          ctx.fillText(att.highest_stage ? ("! STAGE " + att.highest_stage + "/4 INTRUSION") : "! INTRUSION", ax, ay - 18)
         }
 
         ctx.font = "600 9.5px monospace"
