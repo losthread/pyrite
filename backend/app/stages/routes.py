@@ -141,7 +141,7 @@ def check_plausible_waf_drop(session: Dict[str, Any], ip: str) -> Optional[Respo
 async def handle_stage_1(request: Request):
     client = extract_client_identity(request)
     ja4h, fp, ip = client["ja4h"], client["http_fingerprint"], client["ip"]
-    sw = get_or_create_shadow_world(fp, ip)
+    sw = get_or_create_shadow_world(fp, ip, ja4h)
     session = sw["session"]
 
     waf_exit = check_plausible_waf_drop(session, ip)
@@ -210,7 +210,7 @@ router.add_api_route("/api/stage1", handle_stage_1, methods=["GET"])
 async def handle_stage_2(request: Request):
     client = extract_client_identity(request)
     ja4h, fp, ip = client["ja4h"], client["http_fingerprint"], client["ip"]
-    sw = get_or_create_shadow_world(fp, ip)
+    sw = get_or_create_shadow_world(fp, ip, ja4h)
     session = sw["session"]
 
     waf_exit = check_plausible_waf_drop(session, ip)
@@ -362,7 +362,7 @@ router.add_api_route("/api/stage2", handle_stage_2, methods=["POST"])
 async def handle_stage_3(request: Request):
     client = extract_client_identity(request)
     ja4h, fp, ip = client["ja4h"], client["http_fingerprint"], client["ip"]
-    sw = get_or_create_shadow_world(fp, ip)
+    sw = get_or_create_shadow_world(fp, ip, ja4h)
     session = sw["session"]
 
     waf_exit = check_plausible_waf_drop(session, ip)
@@ -445,7 +445,7 @@ async def handle_stage_3(request: Request):
 async def handle_stage_4(request: Request):
     client = extract_client_identity(request)
     ja4h, fp, ip = client["ja4h"], client["http_fingerprint"], client["ip"]
-    sw = get_or_create_shadow_world(fp, ip)
+    sw = get_or_create_shadow_world(fp, ip, ja4h)
     session = sw["session"]
 
     waf_exit = check_plausible_waf_drop(session, ip)

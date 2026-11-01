@@ -109,20 +109,21 @@ def set_topology(seed_key: str) -> Dict[str, Any]:
     return get_active_topology()
 
 
-def get_or_create_shadow_world(ja4h: str, ip: str) -> Dict[str, Any]:
+def get_or_create_shadow_world(fingerprint: str, ip: str, ja4h: Optional[str] = None) -> Dict[str, Any]:
     """
-    Retrieves or initializes an isolated Shadow World for the given JA4H client.
-    Detects cross-IP hopping (VPN/proxy changes) and production log correlation.
+    Retrieves or initializes an isolated Shadow World for the given client
+    fingerprint. Detects cross-IP hopping (VPN/proxy changes) and production
+    log correlation. `ja4h` is the real per-request JA4H (forensic only).
     """
     now = time.time()
     prod_corr = is_prod_correlated(ip)
     ip_changed = False
 
-    session = shadow_worlds.get(ja4h)
+    session = shadow_worlds.get(fingerprint)
     if not session:
         session = {
-            "ja4h": ja4h,
-            "http_fingerprint": ja4h,
+            "ja4h": ja4h or fingerprint,
+            "http_fingerprint": fingerprint,
             "initial_ip": ip,
             "current_ip": ip,
             "observed_ips": [ip],
@@ -142,7 +143,7 @@ def get_or_create_shadow_world(ja4h: str, ip: str) -> Dict[str, Any]:
             },
             "command_history": []
         }
-        shadow_worlds[ja4h] = session
+        shadow_worlds[fingerprint] = session
     else:
         if session["current_ip"] != ip:
             ip_changed = True
@@ -151,6 +152,8 @@ def get_or_create_shadow_world(ja4h: str, ip: str) -> Dict[str, Any]:
                 session["observed_ips"].append(ip)
             if prod_corr:
                 session["prod_correlated"] = True
+        if ja4h:
+            session["ja4h"] = ja4h
         session["last_seen"] = now
 
     return {
