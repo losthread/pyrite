@@ -200,7 +200,7 @@ def get_real_db_events(max_age_seconds: int = 900) -> tuple[int, int, list[dict[
         critical_count = cursor.fetchone()[0]
 
         # Only select recent events to prevent old test clutter from dominating live view
-        cursor.execute("SELECT full_json FROM telemetry_events ORDER BY id DESC LIMIT 50")
+        cursor.execute("SELECT full_json FROM telemetry_events ORDER BY rowid DESC LIMIT 50")
         rows = cursor.fetchall()
         events = []
         for r in rows:

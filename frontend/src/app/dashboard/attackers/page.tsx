@@ -297,6 +297,25 @@ function AttackerDetail({
   attacker: Attacker
   relatedEvents: ReturnType<typeof useDashboardTelemetry>["snapshot"]["events"]
 }) {
+  const { refresh } = useDashboardTelemetry()
+  const [containedSuccess, setContainedSuccess] = React.useState(attacker.status === "contained")
+
+  const handleQuarantine = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/quarantine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ip: attacker.ip, ja4h: attacker.ja4h, contained: true }),
+      })
+      if (res.ok) {
+        setContainedSuccess(true)
+        refresh?.()
+      }
+    } catch (e) {
+      console.warn("Quarantine failed:", e)
+    }
+  }
+
   return (
     <div className="p-3">
       <div className="flex items-center justify-between border-b border-ink/10 pb-3">

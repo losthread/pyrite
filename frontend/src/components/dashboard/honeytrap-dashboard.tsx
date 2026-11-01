@@ -2277,7 +2277,7 @@ export default function App({
           const sessions = data.sessions || [];
           const mapped = mapSessionsToAttackerNodes(sessions);
           setAttackers(mapped);
-          setTotalAttacksCount((prev) => Math.max(prev, mapped.reduce((acc: number, a: any) => acc + a.attempts, 0)));
+          setTotalAttacksCount(mapped.length);
         }
       } catch (e) {
         // backend offline on mount
