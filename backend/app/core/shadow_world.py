@@ -10,8 +10,8 @@ from typing import Dict, Any, List, Optional
 TOPOLOGY_PERSONAS = {
     "Morph-v1.0": {
         "id": "Morph-v1.0",
-        "name": "Morph-v1.0 (Fintech-Git-SQLi)",
-        "description": "Legacy Fintech monolith with exposed Git reflogs and PostgreSQL financial database",
+        "name": "Morph-v1.0",
+        "description": "Fintech monolith services",
         "stage1_endpoint": "/.git/logs/HEAD",
         "stage2_endpoint": "/api/internal/legacy-query",
         "stage3_host": "10.24.0.15",
@@ -21,8 +21,8 @@ TOPOLOGY_PERSONAS = {
     },
     "Morph-v2.0": {
         "id": "Morph-v2.0",
-        "name": "Morph-v2.0 (Cloud-Env-GraphQL)",
-        "description": "Cloud-native microservice with exposed .env staging leak and GraphQL debug gateway",
+        "name": "Morph-v2.0",
+        "description": "Cloud services deployment",
         "stage1_endpoint": "/.env.staging",
         "stage2_endpoint": "/v2/graphql-debug",
         "stage3_host": "172.16.8.4",

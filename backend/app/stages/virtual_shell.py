@@ -150,11 +150,9 @@ drwxr-xr-x 2 deployer deployer 4096 Oct 31 08:15 /opt/scripts
 ./health_check.sh
 docker ps
 git pull origin main
-# Automated Cold Vault Replication Test
 curl -s -H "X-Vault-Key: {crumb3}" http://localhost:8000{stage4_endpoint} -o /tmp/vault_backup.dat
 ls -lh /tmp/vault_backup.dat
 rm /tmp/vault_backup.dat
-# deployer session ended
 history -c
 exit
 """,
@@ -166,24 +164,17 @@ exit
     elif clean_cmd in ["cat /opt/scripts/vault_sync.sh", "cat /opt/scripts/sync.sh", "cat vault_sync.sh"]:
         return {
             "stdout": f"""#!/usr/bin/env bash
-# ==============================================================================
-# VYUH INFRASTRUCTURE // Automated Cold Vault Snapshot Sync
-# DO NOT COMMIT SECRETS TO PUBLIC REPOSITORIES
-# ==============================================================================
 set -euo pipefail
 
 VAULT_ENDPOINT="http://localhost:8000{stage4_endpoint}"
 VAULT_KEY="{crumb3}"
 BACKUP_DIR="/var/backups/cold_vault"
 
-echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Starting automated snapshot sync..."
 mkdir -p "$BACKUP_DIR"
 
 curl -f -s -S \\
   -H "X-Vault-Key: $VAULT_KEY" \\
   "$VAULT_ENDPOINT" > "$BACKUP_DIR/snapshot_$(date +%Y%m%d).parquet"
-
-echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Cold storage snapshot verified."
 """,
             "stderr": "",
             "exit_code": 0,
@@ -192,7 +183,7 @@ echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] Cold storage snapshot verified."
 
     elif clean_cmd == "cat README.vault.txt":
         return {
-            "stdout": f"NOTICE: Direct access to Cold Vault storage requires master authorization.\nUse /opt/scripts/vault_sync.sh to verify automated replication keys.\nCurrent replica target: {stage4_endpoint}\n",
+            "stdout": f"cold vault snapshot sync\n  script: /opt/scripts/vault_sync.sh\n  replica target: {stage4_endpoint}\n",
             "stderr": "",
             "exit_code": 0,
             "crumb_minted": None
