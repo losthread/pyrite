@@ -42,14 +42,20 @@ def _base64url_decode(s: str) -> bytes:
     return base64.urlsafe_b64decode(s.encode("utf-8"))
 
 
-def mint_crumb(stage: int, ja4h: str, seed: Optional[str] = None) -> str:
+def mint_crumb(stage: int, fingerprint: str, seed: Optional[str] = None) -> str:
     """
     Mints a self-describing, HMAC-SHA256 signed breadcrumb honeytoken.
     Format: vk_live_<base64url_payload>.<10_char_hex_sig>
+
+    Each token is uniquely issued: `jti` is a random 64-bit identifier, `t` is
+    the minting timestamp, and `f` binds the stable client fingerprint for
+    weak-moderate (probabilistic) syndicate correlation.
     """
     payload = {
+        "jti": secrets.token_hex(8),
+        "iss": "vyuh",
         "s": int(stage),
-        "f": str(ja4h),
+        "f": str(fingerprint),
         "t": int(time.time() * 1000),
         "seed": str(seed or "Morph-v1.0 (Fintech-Git-SQLi)")
     }
@@ -61,13 +67,14 @@ def mint_crumb(stage: int, ja4h: str, seed: Optional[str] = None) -> str:
     return f"vk_live_{b64_payload}.{sig}"
 
 
-def verify_crumb(token: Optional[str], current_ja4h: Optional[str], current_seed: Optional[str]) -> Dict[str, Any]:
+def verify_crumb(token: Optional[str], current_fingerprint: Optional[str], current_seed: Optional[str]) -> Dict[str, Any]:
     """
     Decodes and verifies an incoming breadcrumb token.
     Flags:
       - valid: bool
       - topology_mutated: bool (Burned token replay attempt)
-      - token_shared: bool (Syndicate collusion / lateral handover)
+      - token_shared: bool (probabilistic syndicate signal — fingerprint mismatch)
+      - ja4h_mismatch: bool (alias of token_shared; fingerprint is evidence, not identity)
       - expired: bool (> 900s)
     """
     if not token or not isinstance(token, str):
@@ -75,6 +82,7 @@ def verify_crumb(token: Optional[str], current_ja4h: Optional[str], current_seed
             "valid": False,
             "topology_mutated": False,
             "token_shared": False,
+            "ja4h_mismatch": False,
             "expired": False,
             "reason": "MISSING_TOKEN"
         }
@@ -85,6 +93,7 @@ def verify_crumb(token: Optional[str], current_ja4h: Optional[str], current_seed
             "valid": False,
             "topology_mutated": False,
             "token_shared": False,
+            "ja4h_mismatch": False,
             "expired": False,
             "reason": "INVALID_TOKEN_FORMAT"
         }
@@ -98,6 +107,7 @@ def verify_crumb(token: Optional[str], current_ja4h: Optional[str], current_seed
             "valid": False,
             "topology_mutated": False,
             "token_shared": False,
+            "ja4h_mismatch": False,
             "expired": False,
             "reason": "INVALID_SIGNATURE"
         }
@@ -111,6 +121,7 @@ def verify_crumb(token: Optional[str], current_ja4h: Optional[str], current_seed
             "valid": False,
             "topology_mutated": False,
             "token_shared": False,
+            "ja4h_mismatch": False,
             "expired": False,
             "reason": "CORRUPTED_PAYLOAD"
         }
@@ -123,17 +134,19 @@ def verify_crumb(token: Optional[str], current_ja4h: Optional[str], current_seed
     # 4. Topology Mutation Check (Burned Token)
     topology_mutated = bool(current_seed and payload.get("seed") != current_seed)
 
-    # 5. Attacker Fingerprint Check (Syndicate Collusion)
-    token_shared = bool(current_ja4h and payload.get("f") != current_ja4h)
+    # 5. Fingerprint mismatch — probabilistic syndicate signal, never proof.
+    ja4h_mismatch = bool(current_fingerprint and payload.get("f") != current_fingerprint)
 
     return {
         "valid": True,
         "stage": payload.get("s"),
-        "original_ja4h": payload.get("f"),
+        "jti": payload.get("jti"),
+        "original_fingerprint": payload.get("f"),
         "minted_at": payload.get("t"),
         "seed": payload.get("seed"),
         "topology_mutated": topology_mutated,
-        "token_shared": token_shared,
+        "token_shared": ja4h_mismatch,
+        "ja4h_mismatch": ja4h_mismatch,
         "expired": expired,
         "reason": "TOKEN_EXPIRED" if expired else None,
         "payload": payload

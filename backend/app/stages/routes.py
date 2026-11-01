@@ -140,8 +140,8 @@ def check_plausible_waf_drop(session: Dict[str, Any], ip: str) -> Optional[Respo
 # ==============================================================================
 async def handle_stage_1(request: Request):
     client = extract_client_identity(request)
-    ja4h, ip = client["ja4h"], client["ip"]
-    sw = get_or_create_shadow_world(ja4h, ip)
+    ja4h, fp, ip = client["ja4h"], client["http_fingerprint"], client["ip"]
+    sw = get_or_create_shadow_world(fp, ip)
     session = sw["session"]
 
     waf_exit = check_plausible_waf_drop(session, ip)
@@ -153,9 +153,9 @@ async def handle_stage_1(request: Request):
     seed_id = topology["seed_id"]
 
     session["highest_stage"] = max(session["highest_stage"], 1)
-    update_threat_score(ja4h, 15)
+    update_threat_score(fp, 15)
 
-    crumb1 = mint_crumb(1, ja4h, seed_id)
+    crumb1 = mint_crumb(1, fp, seed_id)
     session["crumbs"]["stage1"] = crumb1
     dwell = int(time.time() - session["created_at"])
 
@@ -209,8 +209,8 @@ router.add_api_route("/api/stage1", handle_stage_1, methods=["GET"])
 # ==============================================================================
 async def handle_stage_2(request: Request):
     client = extract_client_identity(request)
-    ja4h, ip = client["ja4h"], client["ip"]
-    sw = get_or_create_shadow_world(ja4h, ip)
+    ja4h, fp, ip = client["ja4h"], client["http_fingerprint"], client["ip"]
+    sw = get_or_create_shadow_world(fp, ip)
     session = sw["session"]
 
     waf_exit = check_plausible_waf_drop(session, ip)
@@ -239,10 +239,10 @@ async def handle_stage_2(request: Request):
         query = request.query_params.get("query", "")
 
     # Verify Crumb #1
-    verify_res = verify_crumb(token, ja4h, seed_id)
+    verify_res = verify_crumb(token, fp, seed_id)
 
     session["highest_stage"] = max(session["highest_stage"], 2)
-    update_threat_score(ja4h, 25)
+    update_threat_score(fp, 25)
     dwell = int(time.time() - session["created_at"])
 
     # SQLi pattern checks
@@ -254,7 +254,7 @@ async def handle_stage_2(request: Request):
     )
     is_single_quote_probe = ("'" in query) and not is_exploit
 
-    crumb2 = mint_crumb(2, ja4h, seed_id)
+    crumb2 = mint_crumb(2, fp, seed_id)
     session["crumbs"]["stage2"] = crumb2
 
     # 1. Single Quote Probe (Ego Boost verbose DB syntax error)
@@ -361,8 +361,8 @@ router.add_api_route("/api/stage2", handle_stage_2, methods=["POST"])
 @router.post("/api/shell/exec")
 async def handle_stage_3(request: Request):
     client = extract_client_identity(request)
-    ja4h, ip = client["ja4h"], client["ip"]
-    sw = get_or_create_shadow_world(ja4h, ip)
+    ja4h, fp, ip = client["ja4h"], client["http_fingerprint"], client["ip"]
+    sw = get_or_create_shadow_world(fp, ip)
     session = sw["session"]
 
     waf_exit = check_plausible_waf_drop(session, ip)
@@ -384,7 +384,7 @@ async def handle_stage_3(request: Request):
     except Exception:
         command = request.query_params.get("cmd", "").strip()
 
-    verify_res = verify_crumb(token, ja4h, seed_id)
+    verify_res = verify_crumb(token, fp, seed_id)
     if not verify_res["valid"] or verify_res.get("expired"):
         return JSONResponse(
             status_code=401,
@@ -398,12 +398,12 @@ async def handle_stage_3(request: Request):
         )
 
     session["highest_stage"] = max(session["highest_stage"], 3)
-    update_threat_score(ja4h, 20)
+    update_threat_score(fp, 20)
     dwell = int(time.time() - session["created_at"])
 
     # Run the shell engine in a worker thread: the fast-path stays sub-2ms, and
     # the DeepSeek LLM kernel can take seconds without blocking the event loop.
-    result = await asyncio.to_thread(execute_virtual_shell, command, session, ja4h)
+    result = await asyncio.to_thread(execute_virtual_shell, command, session, fp)
 
     # Broadcast terminal stream to SOC
     await ws_manager.broadcast("terminal_stream", {
@@ -444,8 +444,8 @@ async def handle_stage_3(request: Request):
 # ==============================================================================
 async def handle_stage_4(request: Request):
     client = extract_client_identity(request)
-    ja4h, ip = client["ja4h"], client["ip"]
-    sw = get_or_create_shadow_world(ja4h, ip)
+    ja4h, fp, ip = client["ja4h"], client["http_fingerprint"], client["ip"]
+    sw = get_or_create_shadow_world(fp, ip)
     session = sw["session"]
 
     waf_exit = check_plausible_waf_drop(session, ip)
@@ -462,7 +462,7 @@ async def handle_stage_4(request: Request):
     if not vault_key:
         vault_key = request.query_params.get("key") or request.query_params.get("token")
 
-    verify_res = verify_crumb(vault_key, ja4h, seed_id)
+    verify_res = verify_crumb(vault_key, fp, seed_id)
     if not verify_res["valid"] or verify_res.get("expired"):
         return JSONResponse(
             status_code=403,

@@ -122,6 +122,7 @@ def get_or_create_shadow_world(ja4h: str, ip: str) -> Dict[str, Any]:
     if not session:
         session = {
             "ja4h": ja4h,
+            "http_fingerprint": ja4h,
             "initial_ip": ip,
             "current_ip": ip,
             "observed_ips": [ip],
@@ -196,6 +197,7 @@ def get_all_shadow_worlds() -> List[Dict[str, Any]]:
     return [
         {
             "ja4h": s["ja4h"],
+            "http_fingerprint": s["http_fingerprint"],
             "current_ip": s["current_ip"],
             "initial_ip": s["initial_ip"],
             "observed_ips": s["observed_ips"],
