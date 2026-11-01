@@ -61,7 +61,7 @@ export default function AnalyticsPage() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-mono text-[9px] tracking-[0.14em] text-muted-ink uppercase">
-              Vyuha // Honeytrap
+              PYRITE // Tri-MITRE
             </p>
             <StatusPill tone={mode === "demo" ? "critical" : connected ? "live" : "critical"}>
               {mode === "demo" ? "Simulated analytics" : connected ? "Live analytics" : "Disconnected"}

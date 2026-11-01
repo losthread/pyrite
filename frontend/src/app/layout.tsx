@@ -3,17 +3,17 @@ import type { Metadata, Viewport } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "VYUHA (Chakravyuha) — Easy to Breach. Impossible to Escape.",
+  title: "PYRITE — Glitters Like Gold. Traps Like Iron.",
   description:
-    "An ephemeral, self-mutating 4-stage deception labyrinth that weaponizes attacker greed, tracks cross-IP syndicate collusion via stateless HMAC breadcrumbs, and segregates threats through Wazuh SIEM rules.",
+    "PYRITE // Autonomous Deception & Cryptographic Adversary Labyrinth. An ephemeral, self-mutating 4-stage deception grid that weaponizes attacker greed and tracks cross-IP syndicate collusion via stateless Pyrite Nuggets (HMAC crumbs).",
   keywords: [
+    "PYRITE",
     "active deception",
-    "honeypot",
+    "honeypot labyrinth",
     "Wazuh",
     "MITRE Engage",
     "cybersecurity",
-    "VYUHA",
-    "Chakravyuha",
+    "adversary containment",
   ],
 }
 

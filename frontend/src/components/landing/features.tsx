@@ -26,7 +26,7 @@ export function Features() {
 
         <div className="flex flex-col justify-between gap-8 p-4 sm:p-6 lg:col-span-4 lg:p-8">
           <p className="max-w-[36ch] text-sm leading-relaxed text-muted-ink">
-            VYUHA does not block the attacker at the door. It gives them a
+            PYRITE does not block the attacker at the door. It gives them a
             believable next step, then prices every step in time, exposure, and
             attribution.
           </p>

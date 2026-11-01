@@ -562,7 +562,7 @@ async def get_system_status():
     topology = get_active_topology()
     return {
         "status": "ONLINE",
-        "system": "VYUH (CHAKRAVYUH) Active Deception SOC Engine",
+        "system": "PYRITE Autonomous Deception Grid",
         "version": "1.0.0",
         "activeSeed": topology["seed_id"],
         "persona": topology["persona"],
@@ -581,6 +581,16 @@ async def get_shadow_world_sessions():
 @router.get("/api/prod-logs")
 async def get_production_logs():
     return {"logs": prod_auth_logs}
+
+
+@router.get("/api/deception/topologies")
+async def get_deception_topologies():
+    from app.core.shadow_world import TOPOLOGY_PERSONAS, get_active_topology
+    return {
+        "topologies": list(TOPOLOGY_PERSONAS.values()),
+        "activeSeed": get_active_topology()["seed_id"],
+        "persona": get_active_topology()["persona"]
+    }
 
 
 @router.get("/api/similar-sessions")

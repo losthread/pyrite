@@ -29,6 +29,17 @@ TOPOLOGY_PERSONAS = {
         "stage3_hostname": "k8s-pod-auth-proxy",
         "stage4_endpoint": "/s3/v1/treasury-keys",
         "stage4_asset": "treasury_private_keys.pem"
+    },
+    "Morph-v3.0": {
+        "id": "Morph-v3.0",
+        "name": "Morph-v3.0 (ZeroTrust-OAuth-Kubernetes)",
+        "description": "Zero-trust Kubernetes cluster with leaked service account token and telemetry mesh",
+        "stage1_endpoint": "/.well-known/openid-configuration",
+        "stage2_endpoint": "/api/v3/auth/introspect",
+        "stage3_host": "10.96.0.1",
+        "stage3_hostname": "k8s-control-plane-api",
+        "stage4_endpoint": "/etcd/v3/keys/export",
+        "stage4_asset": "etcd_cluster_state.db"
     }
 }
 

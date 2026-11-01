@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ==============================================================================
-VYUH (CHAKRAVYUH) // ACTIVE DECEPTION ATTACKER DEMO SIMULATOR
+PYRITE // AUTONOMOUS DECEPTION ATTACKER SIMULATOR
 D3COY 1.0 — Problem Statement 04: Deception-Driven Threat Detection & Response
 ==============================================================================
 Interactive Python CLI demo for live pitch presentations.
@@ -115,7 +115,7 @@ def render_header():
 
     print(f"""
 {CYAN}{BOLD}+------------------------------------------------------------------------------+
-|               VYUH (CHAKRAVYUH) // ACTIVE DECEPTION DEMO CLI                 |
+|             PYRITE // AUTONOMOUS ACTIVE DECEPTION DEMO CLI                   |
 |      Problem Statement 04: Deception-Driven Threat Detection & Response      |
 +------------------------------------------------------------------------------+{RESET}
   {BOLD}Target Server:{RESET}       {YELLOW}{state['target_url']}{RESET}
@@ -123,10 +123,10 @@ def render_header():
   {BOLD}Client Fingerprint:{RESET}  {fp_tag}
   {BOLD}Active Topology:{RESET}     {CYAN}{state['active_seed']}{RESET}
   ------------------------------------------------------------------------------
-  {BOLD}Harvested Honeytokens:{RESET}
-    * Stage 1 (Crumb #1):  {fmt_token(state['crumbs']['stage1'])}
-    * Stage 2 (Crumb #2):  {fmt_token(state['crumbs']['stage2'])}
-    * Stage 3 (Crumb #3):  {fmt_token(state['crumbs']['stage3'])}
+  {BOLD}Harvested Pyrite Nuggets (Stateless HMAC Crumbs):{RESET}
+    * Stage 1 (Nugget #1):  {fmt_token(state['crumbs']['stage1'])}
+    * Stage 2 (Nugget #2):  {fmt_token(state['crumbs']['stage2'])}
+    * Stage 3 (Nugget #3):  {fmt_token(state['crumbs']['stage3'])}
   ------------------------------------------------------------------------------""")
 
 

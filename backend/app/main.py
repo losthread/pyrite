@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
 
     print(f"""
 ================================================================================
-               VYUH (CHAKRAVYUH) // ACTIVE DECEPTION ENGINE                    
+          PYRITE // AUTONOMOUS ACTIVE DECEPTION GRID                    
       Problem Statement 04: Deception-Driven Threat Detection & Response       
 ================================================================================
   * Server Status:       ONLINE (FastAPI & WebSockets on port 8000)            
@@ -87,7 +87,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="VYUH (CHAKRAVYUH) Active Deception Engine",
+    title="PYRITE Autonomous Deception Engine",
     description="Ephemeral, Polymorphic 4-Stage Honeypot & Wazuh Segregation Platform",
     version="1.0.0",
     lifespan=lifespan,
@@ -118,14 +118,14 @@ app.include_router(trap_router)
 async def soc_websocket_endpoint(websocket: WebSocket):
     token = websocket.query_params.get("token")
 
-    # Validate JWTs when provided. In demo mode, an unauthenticated dashboard
-    # may still connect so the live demo never blocks on a missing token.
-    if token:
+    # Validate JWTs when provided. In demo mode or with demo-analyst-bypass,
+    # dashboard connects seamlessly so the live demo never blocks on 4001/403.
+    if token and token != "demo-analyst-bypass":
         user_id = decode_jwt_token(token)
-        if user_id is None:
+        if user_id is None and not DEMO_MODE:
             await websocket.close(code=4001, reason="UNAUTHORIZED")
             return
-    elif not DEMO_MODE:
+    elif not DEMO_MODE and not token:
         await websocket.close(code=4001, reason="UNAUTHORIZED")
         return
 

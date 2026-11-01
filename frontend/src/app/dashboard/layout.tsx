@@ -4,9 +4,9 @@ import { DashboardShell } from "@/components/dashboard/dashboard-shell"
 import { DashboardProvider } from "@/hooks/useDashboardTelemetry"
 
 export const metadata: Metadata = {
-  title: "Dashboard — VYUHA",
+  title: "PYRITE // SOC Command Center",
   description:
-    "VYUHA honeytrap network command center: live topology, attackers, events, honeypots, and analytics.",
+    "PYRITE Active Deception Grid: live topology, shadow worlds, real-time red-team console, attackers, and Wazuh telemetry.",
 }
 
 export default function DashboardLayout({
