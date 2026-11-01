@@ -77,7 +77,7 @@ def extract_client_identity(request: Request) -> Dict[str, Any]:
     else:
         canonical_input = f"v={http_version}|ua={user_agent}|lang={accept_language}|headers={header_order_sig}"
 
-    ja4h = hashlib.sha256(canonical_input.encode("utf-8")).hexdigest()[:16]
+    ja4h = hashlib.sha256(canonical_input.encode("utf-8")).hexdigest()
 
     return {
         "ip": ip,
