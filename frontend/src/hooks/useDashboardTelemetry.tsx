@@ -12,10 +12,13 @@ import type {
   DashboardMode,
   DashboardSnapshot,
   SecurityEvent,
+  TarpitProgress,
+  TerminalLine,
 } from "@/lib/dashboard/types"
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000"
+const WS_URL = API_BASE.replace(/^http/, "ws") + "/ws/soc"
 
 interface DashboardTelemetryValue {
   mode: DashboardMode
@@ -24,6 +27,9 @@ interface DashboardTelemetryValue {
   lastUpdated: string | null
   snapshot: DashboardSnapshot
   activeEdgeId: string | null
+  terminalLines: TerminalLine[]
+  tarpitProgress: TarpitProgress | null
+  sendSocAction: (action: string, payload?: Record<string, unknown>) => void
   setMode: (mode: DashboardMode) => void
   togglePause: () => void
   triggerAttack: () => void
@@ -55,6 +61,56 @@ function makeStreamEvent(
   }
 }
 
+function toIso(timestamp: string | undefined): string {
+  if (!timestamp) return new Date().toISOString()
+  if (timestamp.includes("T")) return timestamp
+  const today = new Date().toISOString().slice(0, 10)
+  return `${today}T${timestamp}Z`
+}
+
+const stageDestinations: Record<number, string> = {
+  1: "edge-gw-01",
+  2: "cowrie-ssh",
+  3: "shadow-shell",
+  4: "vault-decoy",
+}
+
+function mapWsEvent(data: Record<string, unknown>): SecurityEvent {
+  const stage = Number(data.stage ?? 0)
+  const wazuh = (data.wazuh ?? {}) as Record<string, unknown>
+  const mitre = (data.mitre ?? {}) as Record<string, unknown>
+  const attack = (mitre.attack ?? {}) as Record<string, unknown>
+  const engage = (mitre.engage ?? {}) as Record<string, unknown>
+  const attacker = (data.attacker ?? {}) as Record<string, unknown>
+  const action = (data.action ?? {}) as Record<string, unknown>
+  const level = Number(wazuh.level ?? 3)
+  const severity =
+    level >= 13 ? "critical" : level >= 8 ? "suspicious" : "info"
+  const destination = stageDestinations[stage] ?? "honeypot"
+
+  return {
+    id: String(data.eventId ?? `ws-${Date.now()}`),
+    timestamp: toIso(data.timestamp as string | undefined),
+    severity,
+    sourceIp: String(attacker.ip ?? ""),
+    destination,
+    destinationIp: "",
+    protocol: stage === 3 ? "ssh" : "http",
+    eventType: "telemetry",
+    description: String(action.title ?? "honeypot telemetry"),
+    ruleId: String(wazuh.ruleId ?? 100500),
+    ruleLevel: level,
+    mitreId: String(attack.id ?? "—"),
+    mitreTactic: String(attack.name ?? "—"),
+    mitreTechnique: String(attack.id ?? "—"),
+    mitreAttack: { id: String(attack.id ?? "—"), name: String(attack.name ?? "—") },
+    mitreEngage: { id: String(engage.id ?? "—"), name: String(engage.name ?? "—") },
+    honeypot: destination,
+    sessionId: (attacker.sessionId as string) ?? null,
+    username: (action.username as string) ?? null,
+  }
+}
+
 export function DashboardProvider({
   children,
 }: {
@@ -74,6 +130,11 @@ export function DashboardProvider({
   const [simulatedAttacks, setSimulatedAttacks] = React.useState(0)
   const [simulatedCaptures, setSimulatedCaptures] = React.useState(0)
   const [activeEdgeId, setActiveEdgeId] = React.useState<string | null>(null)
+  const [terminalLines, setTerminalLines] = React.useState<TerminalLine[]>([])
+  const [tarpitProgress, setTarpitProgress] =
+    React.useState<TarpitProgress | null>(null)
+  const [wsEvents, setWsEvents] = React.useState<SecurityEvent[]>([])
+  const socSocketRef = React.useRef<WebSocket | null>(null)
   const liveAbort = React.useRef<AbortController | null>(null)
 
   const loadLive = React.useCallback(async () => {
@@ -123,6 +184,71 @@ export function DashboardProvider({
   }, [mode, loadLive, paused])
 
   React.useEffect(() => {
+    if (mode !== "live" || paused) {
+      socSocketRef.current?.close()
+      socSocketRef.current = null
+      return
+    }
+
+    const socket = new WebSocket(WS_URL)
+    socSocketRef.current = socket
+
+    socket.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data as string)
+        const type = msg.type as string
+        const data = (msg.data ?? {}) as Record<string, unknown>
+        if (type === "soc_telemetry") {
+          const mapped = mapWsEvent(data)
+          setWsEvents((prev) => [mapped, ...prev].slice(0, 100))
+          setActiveEdgeId(
+            mapped.destination === "vault-decoy"
+              ? "e-14"
+              : mapped.destination === "cowrie-ssh"
+                ? "e-01"
+                : null
+          )
+        } else if (type === "terminal_stream") {
+          setTerminalLines((prev) =>
+            [
+              {
+                ja4h: String(data.ja4h ?? ""),
+                command: String(data.command ?? ""),
+                stdout: String(data.stdout ?? ""),
+                stderr: String(data.stderr ?? ""),
+                exitCode: Number(data.exitCode ?? 0),
+                cwd: String(data.cwd ?? ""),
+                timestamp: String(data.timestamp ?? ""),
+              },
+              ...prev,
+            ].slice(0, 120)
+          )
+        } else if (type === "tarpit_progress") {
+          setTarpitProgress({
+            ja4h: String(data.ja4h ?? ""),
+            bytesSent: Number(data.bytesSent ?? 0),
+            chunkSize: Number(data.chunkSize ?? 0),
+            speed: String(data.speed ?? ""),
+            dwellTimeSeconds: Number(data.dwellTimeSeconds ?? 0),
+            status: String(data.status ?? ""),
+          })
+        }
+      } catch {
+        // ignore malformed socket frames
+      }
+    }
+
+    socket.onclose = () => {
+      if (socSocketRef.current === socket) socSocketRef.current = null
+    }
+
+    return () => {
+      socket.close()
+      if (socSocketRef.current === socket) socSocketRef.current = null
+    }
+  }, [mode, paused])
+
+  React.useEffect(() => {
     if (mode !== "demo" || paused) return
 
     const timer = window.setInterval(() => {
@@ -158,6 +284,16 @@ export function DashboardProvider({
     setPaused((value) => !value)
   }, [])
 
+  const sendSocAction = React.useCallback(
+    (action: string, payload?: Record<string, unknown>) => {
+      const socket = socSocketRef.current
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ action, ...(payload ?? {}) }))
+      }
+    },
+    []
+  )
+
   const triggerAttack = React.useCallback(() => {
     if (mode !== "demo") return
     const template = demoStreamEvents[streamIndex % demoStreamEvents.length]
@@ -190,7 +326,14 @@ export function DashboardProvider({
 
   const snapshot = React.useMemo<DashboardSnapshot>(() => {
     if (mode === "live") {
-      return liveSnapshot ?? emptySnapshot
+      const base = liveSnapshot ?? emptySnapshot
+      if (!wsEvents.length) return base
+      const wsIds = new Set(wsEvents.map((event) => event.id))
+      const merged = [
+        ...wsEvents,
+        ...base.events.filter((event) => !wsIds.has(event.id)),
+      ].slice(0, 300)
+      return { ...base, events: merged }
     }
 
     const streamedCritical = streamedEvents.filter(
@@ -233,6 +376,7 @@ export function DashboardProvider({
     streamedEvents,
     simulatedAttacks,
     simulatedCaptures,
+    wsEvents,
   ])
 
   const value = React.useMemo<DashboardTelemetryValue>(
@@ -243,6 +387,9 @@ export function DashboardProvider({
       lastUpdated,
       snapshot,
       activeEdgeId,
+      terminalLines,
+      tarpitProgress,
+      sendSocAction,
       setMode,
       togglePause,
       triggerAttack,
@@ -259,6 +406,9 @@ export function DashboardProvider({
       lastUpdated,
       snapshot,
       activeEdgeId,
+      terminalLines,
+      tarpitProgress,
+      sendSocAction,
       setMode,
       togglePause,
       triggerAttack,

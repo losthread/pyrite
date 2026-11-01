@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+  BrainCircuit,
   ChartNoAxesCombined,
   ChevronLeft,
   Crosshair,
@@ -40,6 +41,11 @@ const navigation = [
         href: "/dashboard/analytics",
         icon: ChartNoAxesCombined,
       },
+      {
+        label: "Intelligence",
+        href: "/dashboard/intel",
+        icon: BrainCircuit,
+      },
     ],
   },
 ]
@@ -51,6 +57,7 @@ const pageTitles: Record<string, string> = {
   "/dashboard/events": "Live events",
   "/dashboard/honeypots": "Honeypots",
   "/dashboard/analytics": "Analytics",
+  "/dashboard/intel": "Intelligence",
 }
 
 function formatClock(date: Date) {
