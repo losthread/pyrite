@@ -13,7 +13,7 @@ import type {
 } from "@/lib/dashboard/types"
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000"
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8003"
 
 const WS_BASE = API_BASE.replace(/^http/, "ws") + "/ws/soc?token=demo-analyst-bypass"
 

@@ -30,8 +30,12 @@ DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() in {"1", "true", "yes"}
 FRONTEND_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
     "http://localhost:5173",
     "http://localhost:5174",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
 ]
 _extra_origin = os.getenv("FRONTEND_URL")
 if _extra_origin:

@@ -6,7 +6,7 @@ import { Terminal, ShieldAlert, ArrowUpRight, Play, Check, CornerDownLeft, Spark
 import { cn } from "@/lib/utils"
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000"
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8003"
 
 const PRESETS = [
   { label: "Anti-Docker Probe", cmd: "ls -la /.dockerenv" },

@@ -107,6 +107,28 @@ const THEMES = {
 };
 
 // Keep TOKENS reference for canvas rendering primitives
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8003'
+).replace(/\/$/, '');
+const WS_BASE = `${API_BASE.replace(/^http/, 'ws')}/ws/soc?token=demo-analyst-bypass`;
+
+// Keep the live surface honest: anything older than this window is evicted,
+// matching the backend TTL (VYUH_EVENT_WINDOW_MINUTES, default 30).
+const EVENT_WINDOW_MS = 30 * 60 * 1000;
+
+const formatEventTime = (value?: string) => {
+  if (!value) return '—';
+  const trimmed = value.trim();
+  if (/^\d{1,2}:\d{2}:\d{2}(\.\d+)?$/.test(trimmed)) {
+    return `${trimmed.slice(0, 8)} UTC`;
+  }
+  const d = new Date(trimmed);
+  if (Number.isNaN(d.getTime())) return value;
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(
+    d.getUTCMinutes()
+  ).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')} UTC`;
+};
+
 const TOKENS = {
   bg: '#F1EFE9',
   surface: '#D8D5CE',
@@ -1720,11 +1742,7 @@ export default function App({
   // Strict Separation: 'DEMO' vs 'LIVE'
   const [operatingMode, setOperatingMode] = useState(initialMode); // 'DEMO' | 'LIVE'
   const [liveConnectionState, setLiveConnectionState] = useState('DISCONNECTED'); // 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED' | 'ERROR'
-  const [wsEndpoint, setWsEndpoint] = useState(
-    typeof window !== 'undefined'
-      ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname || 'localhost'}:8000/ws/soc?token=demo-analyst-bypass`
-      : 'ws://localhost:8000/ws/soc?token=demo-analyst-bypass'
-  );
+  const [wsEndpoint, setWsEndpoint] = useState(WS_BASE);
   const [isMonitoringActive, setIsMonitoringActive] = useState(true);
   const [demoStepIndex, setDemoStepIndex] = useState(0);
 
@@ -1803,6 +1821,7 @@ export default function App({
     const newEvt = {
       id: `EVT-${Math.floor(1000 + Math.random() * 8999)}`,
       timestamp: getNowTimestamp(),
+      ts: Date.now(),
       ...evt,
     };
     setEvents((prev) => [newEvt, ...prev.slice(0, 79)]);
@@ -1969,51 +1988,237 @@ export default function App({
     });
   };
 
-  // Fetch real backend sessions on mount if present
-  useEffect(() => {
-    let active = true;
-    async function loadRealSessions() {
-      try {
-        const apiBase = typeof window !== 'undefined'
-          ? `${window.location.protocol}//${window.location.hostname || 'localhost'}:8000`
-          : 'http://localhost:8000';
-        const res = await fetch(`${apiBase}/api/shadow-worlds`);
-        if (res.ok && active) {
-          const data = await res.json();
-          const sessions = data.sessions || [];
-          if (sessions.length > 0) {
-            const mapped = sessions.map((s: any, idx: number) => ({
-              id: `att-real-${idx}`,
-              ip: s.current_ip || s.initial_ip || '185.220.101.4',
-              nodeType: 'attacker',
-              asn: s.prod_correlated ? 'Tor Exit (East-West Correlated)' : 'Adversary (Observed)',
-              attackType: s.highest_stage >= 4 ? 'Cold Vault Exfiltration' : s.highest_stage >= 3 ? 'Jumpbox Shell Esc' : s.highest_stage >= 2 ? 'SQLi HoneyPatch' : 'Recon Probe',
-              firstSeen: s.last_seen || 'Active',
-              lastSeen: 'Active',
-              attempts: s.command_count || 1,
-              targetedHoneypots: ['honeypot-ssh-01'],
-              protocols: ['TCP', 'SSH'],
-              ports: [8000, 22],
-              severity: s.threat_score >= 80 ? 'critical' : 'high',
-              status: s.plausible_waf_drop ? 'Contained' : 'Active',
-              threatScore: s.threat_score || 85,
-              ja4h: s.ja4h,
-              payloads: [],
-              x: -250 + (idx * 60),
-              y: -140 + (idx * 50),
-            }));
-            setAttackers(mapped);
-            setTotalAttacksCount((prev) => Math.max(prev, mapped.reduce((acc: number, a: any) => acc + a.attempts, 0)));
-          }
-        }
-      } catch (e) {
-        // backend offline on mount
+  // ==========================================================================
+  // LIVE BACKEND SNAPSHOT (honeypot fleet, attackers, events, metrics)
+  // Pulled from FastAPI on mount and refreshed every 15s. The backend applies
+  // the 30-minute telemetry window, so a reload never resurrects old attacks.
+  // ==========================================================================
+  const refreshLiveSnapshot = useCallback(async () => {
+    try {
+      const [snapshotRes, shadowRes] = await Promise.all([
+        fetch(`${API_BASE}/api/dashboard/snapshot`, {
+          headers: { Accept: 'application/json' },
+        }),
+        fetch(`${API_BASE}/api/shadow-worlds`, {
+          headers: { Accept: 'application/json' },
+        }),
+      ]);
+
+      if (!snapshotRes.ok) return;
+      const snapshot = await snapshotRes.json();
+      if (!snapshot || snapshot.source !== 'pyrite-live') return;
+
+      const backendHoneypots: any[] = Array.isArray(snapshot.honeypots)
+        ? snapshot.honeypots
+        : [];
+
+      // 1. Honeypot fleet — mirror every decoy the backend exposes.
+      const positionFor = (idx: number) => {
+        const ring = [
+          [-135, -115],
+          [135, -115],
+          [-135, 115],
+          [135, 115],
+          [0, -190],
+          [0, 190],
+          [-275, 0],
+          [275, 0],
+        ];
+        return ring[idx % ring.length];
+      };
+
+      let mappedHoneypots: any[] = [];
+      if (backendHoneypots.length > 0) {
+        mappedHoneypots = backendHoneypots.map((hp: any, idx: number) => {
+          const rawStatus = String(hp.status || 'online').toLowerCase();
+          const capturing =
+            rawStatus === 'capturing' || rawStatus === 'under attack';
+          const [px, py] = positionFor(idx);
+          return {
+            id: hp.id,
+            name: hp.name,
+            ip: hp.ip,
+            nodeType: 'honeypot',
+            type: hp.type ? `${hp.type} Decoy` : 'Deception Decoy',
+            service: hp.host || hp.name,
+            protocols: (Array.isArray(hp.protocols) ? hp.protocols : []).map(
+              (p: any) => String(p).toUpperCase()
+            ),
+            region: 'Pyrite Deception Grid',
+            status: capturing ? 'Under Attack' : 'Online',
+            severity: hp.severity || (capturing ? 'high' : 'low'),
+            uptime: 'Live',
+            totalInteractions: hp.interactions || 0,
+            activeSessions: hp.sessions || 0,
+            lastActivity: capturing
+              ? 'Capturing adversary traffic'
+              : 'Idle / Listening',
+            cpu: 0,
+            memory: 0,
+            x: px,
+            y: py,
+          };
+        });
+        setHoneypots(mappedHoneypots);
+        setSelectedHoneypotDetail(
+          (prev: any) =>
+            mappedHoneypots.find((hp: any) => hp.id === prev?.id) ||
+            mappedHoneypots[0]
+        );
       }
+
+      const honeypotIdsByName = new Map<string, string>();
+      backendHoneypots.forEach((hp: any) => {
+        if (hp?.name) honeypotIdsByName.set(String(hp.name), String(hp.id));
+        if (hp?.id) honeypotIdsByName.set(String(hp.id), String(hp.id));
+      });
+
+      // 2. Events — map every backend telemetry frame into the SOC stream.
+      const rawEvents: any[] = Array.isArray(snapshot.events)
+        ? snapshot.events
+        : [];
+      if (rawEvents.length > 0) {
+        const mappedEvents = rawEvents.map((ev: any, idx: number) => {
+          const severity =
+            ev.severity === 'critical'
+              ? 'critical'
+              : ev.severity === 'suspicious'
+              ? 'high'
+              : 'info';
+          const idStr = String(ev.id || '');
+          const embeddedEpoch = idStr.startsWith('evt_')
+            ? Number(idStr.split('_')[1])
+            : NaN;
+          const parsedEpoch = Date.parse(ev.timestamp);
+          const epoch = Number.isFinite(embeddedEpoch)
+            ? embeddedEpoch
+            : Number.isFinite(parsedEpoch)
+            ? parsedEpoch
+            : Date.now();
+          return {
+            id: ev.id || `EVT-LIVE-${idx}`,
+            ts: epoch,
+            timestamp: formatEventTime(ev.timestamp),
+            severity,
+            source: ev.sourceIp || '0.0.0.0',
+            destination: ev.honeypot || ev.destination || 'cowrie-ssh',
+            protocol: String(ev.protocol || 'tcp').toUpperCase(),
+            type: String(ev.eventType || 'SOC_TELEMETRY')
+              .toUpperCase()
+              .replace(/[^A-Z0-9]+/g, '_'),
+            description: ev.description || ev.eventType || 'Telemetry event',
+            ruleId: ev.ruleId,
+            ruleLevel: ev.ruleLevel,
+            mitre_attack: ev.mitreId,
+            mitre_technique: ev.mitreTechnique,
+            ja4h: ev.sessionId,
+            raw:
+              typeof ev.raw === 'string'
+                ? ev.raw
+                : JSON.stringify(ev.raw ?? ev, null, 2),
+          };
+        });
+        mappedEvents.sort((a: any, b: any) => b.ts - a.ts);
+        setEvents(mappedEvents.slice(0, 80));
+      }
+
+      // 3. Attackers — canonical snapshot list enriched with shadow worlds.
+      const sessions: any[] = [];
+      if (shadowRes.ok) {
+        const shadow = await shadowRes.json();
+        if (Array.isArray(shadow?.sessions)) sessions.push(...shadow.sessions);
+      }
+      const sessionByJa4h = new Map<string, any>(
+        sessions.map((s: any) => [String(s.ja4h), s])
+      );
+
+      const snapshotAttackers: any[] = Array.isArray(snapshot.attackers)
+        ? snapshot.attackers
+        : [];
+      const cutoff = Date.now() - EVENT_WINDOW_MS;
+
+      const mappedAttackers = snapshotAttackers
+        .map((att: any, idx: number) => {
+          const session = sessionByJa4h.get(String(att.ja4h)) || null;
+          const targetNames: string[] =
+            Array.isArray(att.honeypots) && att.honeypots.length > 0
+              ? att.honeypots
+              : ['cowrie-ssh'];
+          const targetedHoneypots = targetNames.map(
+            (name) => honeypotIdsByName.get(String(name)) || String(name)
+          );
+          const stage = session?.highest_stage || 0;
+          const attackType =
+            stage >= 4
+              ? 'Cold Vault Exfiltration'
+              : stage >= 3
+              ? 'Shadow Shell Escape'
+              : stage >= 2
+              ? 'SQLi HoneyPatch Exploit'
+              : 'Recon & Credential Probe';
+          const threatScore =
+            session?.threat_score ??
+            (att.severity === 'critical' ? 92 : 74);
+          const lastSeenEpoch = Date.parse(att.lastSeen || '');
+          return {
+            id: att.id || `att-real-${idx}`,
+            ip: att.ip || '0.0.0.0',
+            nodeType: 'attacker',
+            asn: 'External Adversary (Observed)',
+            attackType,
+            firstSeen: formatEventTime(att.firstSeen),
+            lastSeen: formatEventTime(att.lastSeen),
+            ts: Number.isFinite(lastSeenEpoch) ? lastSeenEpoch : Date.now(),
+            attempts: att.attempts || 1,
+            targetedHoneypots,
+            protocols: (Array.isArray(att.protocols) ? att.protocols : ['tcp']).map(
+              (p: any) => String(p).toUpperCase()
+            ),
+            ports: [8000, 22],
+            severity: att.severity === 'critical' ? 'critical' : 'high',
+            status: att.status === 'contained' ? 'Contained' : 'Active',
+            threatScore,
+            ja4h: att.ja4h,
+            payloads: [],
+            x: -280 + (idx % 3) * 40,
+            y: -150 + idx * 90,
+          };
+        })
+        .filter((att: any) => att.ts >= cutoff);
+
+      setAttackers(mappedAttackers);
+
+      const metrics = snapshot.metrics || {};
+      setTotalAttacksCount(
+        Number(metrics.totalAttacks) ||
+          mappedAttackers.reduce(
+            (acc: number, a: any) => acc + (a.attempts || 0),
+            0
+          )
+      );
+    } catch (e) {
+      // Backend offline — leave the last known live state untouched.
     }
-    loadRealSessions();
-    return () => {
-      active = false;
+  }, []);
+
+  useEffect(() => {
+    refreshLiveSnapshot();
+    const id = setInterval(refreshLiveSnapshot, 15000);
+    return () => clearInterval(id);
+  }, [refreshLiveSnapshot]);
+
+  // Client-side enforcement of the telemetry window, so a long-lived tab drops
+  // events that age out between snapshot refreshes.
+  useEffect(() => {
+    const prune = () => {
+      const cutoff = Date.now() - EVENT_WINDOW_MS;
+      setEvents((prev: any[]) =>
+        prev.filter((ev: any) => !ev.ts || ev.ts >= cutoff)
+      );
     };
+    prune();
+    const id = setInterval(prune, 60000);
+    return () => clearInterval(id);
   }, []);
 
   // ==========================================================================
@@ -2035,7 +2240,7 @@ export default function App({
           setLiveConnectionState('DISCONNECTED');
           setStatusBanner({
             level: 'critical',
-            text: `LIVE BACKEND UNREACHABLE (${wsEndpoint}). Ensure FastAPI is running on port 8000.`,
+            text: `LIVE BACKEND UNREACHABLE (${wsEndpoint}). Ensure FastAPI is running on port 8003.`,
           });
         }
       }, 3500);
@@ -3114,7 +3319,7 @@ export default function App({
                 >
                   <option value="ALL">ALL HONEYPOTS</option>
                   {honeypots.map((h) => (
-                    <option key={h.id} value={h.id}>
+                    <option key={h.id} value={h.name}>
                       {h.name.toUpperCase()}
                     </option>
                   ))}

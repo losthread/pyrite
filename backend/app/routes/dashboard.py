@@ -112,10 +112,25 @@ def _severity(level: int) -> str:
     return "info"
 
 
+def _session_is_recent(session: dict[str, Any], now_epoch: float) -> bool:
+    """Drop in-memory shadow worlds that have not been touched inside the window."""
+    try:
+        last_seen = datetime.strptime(
+            str(session.get("last_seen", "")), "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc)
+        return now_epoch - last_seen.timestamp() <= (EVENT_WINDOW_MS / 1000)
+    except Exception:
+        return False
+
+
 def build_snapshot() -> dict[str, Any]:
     now_iso = datetime.now(timezone.utc).isoformat()
     total_db_events, critical_db_events, raw_events = get_real_db_events()
-    sessions = get_all_shadow_worlds()
+    sessions = [
+        s
+        for s in get_all_shadow_worlds()
+        if _session_is_recent(s, time.time())
+    ]
 
     total_attacks = max(total_db_events, sum(s.get("command_count", 0) for s in sessions))
     active_attackers = len([s for s in sessions if not s.get("plausible_waf_drop")])
@@ -209,7 +224,9 @@ def build_snapshot() -> dict[str, Any]:
                 "firstSeen": s.get("last_seen", now_iso),
                 "lastSeen": s.get("last_seen", now_iso),
                 "attempts": s.get("command_count", 0),
-                "honeypots": ["cowrie-ssh"],
+                "honeypots": (
+                    ["cowrie-ssh", "vault-decoy"] if stage >= 4 else ["cowrie-ssh"]
+                ),
                 "protocols": ["tcp", "ssh"],
                 "severity": sev,
                 "status": "contained" if s.get("plausible_waf_drop") else "active",
