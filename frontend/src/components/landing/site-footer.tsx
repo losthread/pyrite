@@ -8,15 +8,15 @@ export function SiteFooter() {
       <div className="grid lg:grid-cols-[1.3fr_2.7fr]">
         <div className="flex flex-col justify-between gap-8 border-b border-ink p-5 sm:p-6 lg:border-r lg:border-b-0">
           <Link href="/" className="group flex items-center gap-3">
-            <span className="grid size-8 place-items-center bg-ink text-[12px] font-semibold text-paper">
-              V
+            <span className="grid size-8 place-items-center bg-signal text-[12px] font-bold text-ink">
+              Fe
             </span>
             <span>
-              <span className="block font-display text-[1.5rem] leading-none tracking-[-0.04em] uppercase">
-                VYUHA
+              <span className="block font-display text-[1.5rem] leading-none tracking-[-0.04em] uppercase text-ink">
+                PYRITE
               </span>
               <span className="mt-1 block font-mono text-[8px] tracking-[0.14em] text-muted-ink uppercase">
-                Active deception division
+                FOOL'S GOLD DECEPTION GRID // FeS₂
               </span>
             </span>
           </Link>
@@ -67,7 +67,7 @@ export function SiteFooter() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink px-5 py-3">
         <span className="micro-sm text-muted-ink">
-          © 2026 · Chakravyuha Systems · SOC-01
+          © 2026 · PYRITE Deception Systems · FeS₂ // SOC-01
         </span>
         <div className="flex items-center gap-5">
           <span className="micro-sm hidden text-muted-ink sm:inline">

@@ -283,7 +283,7 @@ export const footerColumns = [
   {
     title: "Signal",
     links: [
-      { label: "soc@vyuha.dev" },
+      { label: "soc@pyrite.sec" },
       { label: "Rulebook 100500–100506" },
       { label: "Morph-v2.0 / Active" },
     ],

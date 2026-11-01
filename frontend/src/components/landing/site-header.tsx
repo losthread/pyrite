@@ -22,17 +22,17 @@ export function SiteHeader() {
         <Link
           href="/"
           className="group flex items-center gap-2.5 border-r border-ink px-3 sm:px-5"
-          aria-label="VYUHA home"
+          aria-label="PYRITE home"
         >
-          <span className="grid size-7 place-items-center bg-ink text-[11px] font-semibold text-paper">
-            V
+          <span className="grid size-7 place-items-center bg-signal text-[11px] font-bold text-ink">
+            Fe
           </span>
           <span className="leading-none">
-            <span className="block font-display text-[1.4rem] tracking-[-0.04em] uppercase">
-              VYUHA
+            <span className="block font-display text-[1.4rem] tracking-[-0.04em] uppercase text-ink">
+              PYRITE
             </span>
-            <span className="mt-1 block font-mono text-[8px] tracking-[0.12em] text-muted-ink uppercase">
-              Chakravyuha / 001
+            <span className="mt-1 block font-mono text-[8px] tracking-[0.14em] text-muted-ink uppercase">
+              FOOL'S GOLD // FeS₂
             </span>
           </span>
         </Link>

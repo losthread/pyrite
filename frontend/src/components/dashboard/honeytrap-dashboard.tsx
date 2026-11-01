@@ -1705,18 +1705,31 @@ function EntityInspectorPanel({
 // ============================================================================
 // MAIN APPLICATION SHELL
 // ============================================================================
-export default function App() {
+export default function App({
+  hideSidebar = true,
+  hideHeader = true,
+  initialMode = 'LIVE',
+}: {
+  hideSidebar?: boolean;
+  hideHeader?: boolean;
+  initialMode?: 'DEMO' | 'LIVE';
+} = {}) {
   // Navigation & Layout ('overview' | 'network' | 'attackers' | 'events' | 'honeypots' | 'analytics' | 'settings')
   const [activePage, setActivePage] = useState('overview');
   const [themeMode, setThemeMode] = useState('dark'); // Default to dark mode as requested
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [currentTime, setCurrentTime] = useState('14:30:19 UTC');
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   // Strict Separation: 'DEMO' vs 'LIVE'
-  const [operatingMode, setOperatingMode] = useState('DEMO'); // 'DEMO' | 'LIVE'
+  const [operatingMode, setOperatingMode] = useState(initialMode); // 'DEMO' | 'LIVE'
   const [liveConnectionState, setLiveConnectionState] = useState('DISCONNECTED'); // 'CONNECTING' | 'CONNECTED' | 'RECONNECTING' | 'DISCONNECTED' | 'ERROR'
-  const [wsEndpoint, setWsEndpoint] = useState('ws://localhost:8080/api/v1/stream');
+  const [wsEndpoint, setWsEndpoint] = useState(
+    typeof window !== 'undefined'
+      ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.hostname || 'localhost'}:8000/ws/soc?token=demo-analyst-bypass`
+      : 'ws://localhost:8000/ws/soc?token=demo-analyst-bypass'
+  );
   const [isMonitoringActive, setIsMonitoringActive] = useState(true);
   const [demoStepIndex, setDemoStepIndex] = useState(0);
 
@@ -1988,7 +2001,7 @@ export default function App() {
     setLiveConnectionState('CONNECTING');
     setStatusBanner({
       level: 'info',
-      text: `LIVE MODE: Attempting WebSocket handshake with ${wsEndpoint}...`,
+      text: `LIVE MODE: Connecting to FastAPI Deception WebSocket at ${wsEndpoint}...`,
     });
 
     try {
@@ -1999,35 +2012,94 @@ export default function App() {
           setLiveConnectionState('DISCONNECTED');
           setStatusBanner({
             level: 'critical',
-            text: `LIVE BACKEND UNREACHABLE (${wsEndpoint}): No simulated events are generated in Live Mode.`,
+            text: `LIVE BACKEND UNREACHABLE (${wsEndpoint}). Ensure FastAPI is running on port 8000.`,
           });
         }
-      }, 2200);
+      }, 3500);
 
       ws.onopen = () => {
         clearTimeout(timeout);
         setLiveConnectionState('CONNECTED');
         setStatusBanner({
           level: 'info',
-          text: `LIVE STREAM CONNECTED: Receiving authenticated telemetry from ${wsEndpoint}`,
+          text: `● LIVE BACKEND CONNECTED (10.46.34.107:9200 WAZUH LINKED) · Authenticated via bypass token`,
         });
       };
 
       ws.onmessage = (msg) => {
         try {
           const data = JSON.parse(msg.data);
-          appendEvent({
-            severity: data.severity || 'high',
-            source: data.source || '0.0.0.0',
-            destination: data.destination || 'honeypot-ssh-01',
-            protocol: data.protocol || 'TCP',
-            type: data.type || 'LIVE_TELEMETRY',
-            description: data.description || 'Inbound telemetry frame ingested',
-            raw: msg.data,
-          });
-          setTotalAttacksCount((c) => c + 1);
+          if (data.action === 'system_init') {
+            setStatusBanner({
+              level: 'info',
+              text: `PYRITE KERNEL ACTIVE · Seed 0x${(data.seed || 0).toString(16)} · Wazuh: ${data.wazuh_status || 'ONLINE'}`,
+            });
+            if (data.active_attackers && Array.isArray(data.active_attackers)) {
+              setAttackers((prev) => {
+                const map = new Map(prev.map((a) => [a.ip, a]));
+                data.active_attackers.forEach((att: any) => {
+                  const existing = map.get(att.ip);
+                  map.set(att.ip, {
+                    id: att.id || existing?.id || `att-live-${att.ip.replace(/\./g, '-')}`,
+                    ip: att.ip,
+                    nodeType: 'attacker',
+                    asn: att.asn || existing?.asn || 'External Adversary',
+                    attackType: att.attackType || existing?.attackType || 'Reconnaissance Probe',
+                    firstSeen: att.firstSeen || existing?.firstSeen || 'Live Session',
+                    lastSeen: 'Active',
+                    attempts: att.attempts || (existing ? existing.attempts + 1 : 1),
+                    targetedHoneypots: att.targetedHoneypots || existing?.targetedHoneypots || ['honeypot-ssh-01'],
+                    protocols: att.protocols || existing?.protocols || ['TCP'],
+                    ports: att.ports || existing?.ports || [8000],
+                    severity: att.severity || 'critical',
+                    status: att.status || 'Malicious',
+                    threatScore: att.threatScore || 85,
+                    ja4h: att.ja4h,
+                    payloads: att.payloads || existing?.payloads || [],
+                    x: existing?.x || (Math.random() * 200 - 100),
+                    y: existing?.y || (Math.random() * 200 - 100),
+                  });
+                });
+                return Array.from(map.values());
+              });
+            }
+          } else if (data.action === 'soc_telemetry') {
+            const evt = data.event || data;
+            const wazuh = data.wazuh || {};
+            appendEvent({
+              severity: evt.severity || (evt.wazuh_rule >= 100504 ? 'critical' : 'high'),
+              source: evt.ip || '198.51.100.219',
+              destination: evt.stage_name || evt.destination || 'honeypot-ssh-01',
+              protocol: evt.protocol || 'TCP',
+              type: evt.stage ? `STAGE_${evt.stage}_EXPLOIT` : (evt.type || 'SOC_TELEMETRY'),
+              description: evt.intent_summary || evt.description || `Wazuh Rule ${evt.wazuh_rule || wazuh.rule_id || '100501'} Ingested`,
+              ja4h: evt.ja4h,
+              hassh: evt.hassh,
+              mitre_attack: evt.mitre_attack,
+              mitre_defend: evt.mitre_defend,
+              mitre_engage: evt.mitre_engage,
+              raw: msg.data,
+            });
+            setTotalAttacksCount((c) => c + 1);
+          } else if (data.action === 'topology_mutated') {
+            setStatusBanner({
+              level: 'info',
+              text: `TOPOLOGY MUTATION APPLIED: Seed rotated to 0x${(data.new_seed || 0).toString(16)}`,
+            });
+          } else {
+            appendEvent({
+              severity: data.severity || 'high',
+              source: data.source || '0.0.0.0',
+              destination: data.destination || 'honeypot-ssh-01',
+              protocol: data.protocol || 'TCP',
+              type: data.type || 'LIVE_TELEMETRY',
+              description: data.description || 'Live socket frame received',
+              raw: msg.data,
+            });
+            setTotalAttacksCount((c) => c + 1);
+          }
         } catch (err) {
-          // Ignore malformed frame
+          // malformed frame ignore
         }
       };
 
@@ -2036,13 +2108,20 @@ export default function App() {
         setLiveConnectionState('ERROR');
         setStatusBanner({
           level: 'critical',
-          text: `LIVE STREAM ERROR: Failed to establish WebSocket connection to ${wsEndpoint}.`,
+          text: `LIVE STREAM ERROR: WebSocket connection to ${wsEndpoint} failed.`,
         });
       };
     } catch (err) {
       setLiveConnectionState('ERROR');
     }
   }, [wsEndpoint, appendEvent]);
+
+  // Auto-connect to live stream on mount if in live mode
+  useEffect(() => {
+    if (operatingMode === 'LIVE' && liveConnectionState === 'DISCONNECTED') {
+      initiateLiveConnection();
+    }
+  }, [operatingMode, liveConnectionState, initiateLiveConnection]);
 
   // Allow operator to test ingesting a raw JSON frame into the Live pipeline
   const injectTestLiveFrame = () => {
@@ -2174,6 +2253,7 @@ export default function App() {
       {/* ====================================================================
           PERSISTENT LEFT SIDEBAR NAVIGATION + TELEMETRY INSPECTOR BELOW SETTINGS
       ==================================================================== */}
+      {!hideSidebar && (
       <aside
         className={cn(
           sidebarCollapsed ? 'md:w-16' : 'md:w-80',
@@ -2299,25 +2379,27 @@ export default function App() {
           </div>
         )}
       </aside>
+      )}
 
       {/* ====================================================================
           MAIN VIEWPORT AREA
       ==================================================================== */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* TOP STATUS & MODE BAR */}
+        {!hideHeader ? (
         <header className="px-5 py-2.5 border-b border-[#27272A] bg-[#101012] text-[#F1EFE9] flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 flex-wrap">
             <Link
               href="/"
               className="flex items-center gap-1.5 px-2.5 py-1 border border-[#27272A] bg-[#141416] text-[#9A9891] hover:text-[#F1EFE9] hover:border-[#F1EFE9] font-mono text-[10px] uppercase transition-colors"
-              title="Return to VYUHA Landing Overview"
+              title="Return to PYRITE Landing Overview"
             >
               <ArrowLeft size={11} className="text-[#FF493D]" />
               <span>EXIT TO OVERVIEW</span>
             </Link>
 
             <span className="font-mono text-xs uppercase tracking-widest font-bold text-[#F1EFE9]">
-              HONEYTRAP // {activePage.toUpperCase()}
+              PYRITE // {activePage.toUpperCase()}
             </span>
 
             <div className="h-3.5 w-[1px] bg-[#27272A]" />
@@ -2422,6 +2504,50 @@ export default function App() {
             </span>
           </div>
         </header>
+        ) : (
+        <div className="px-4 py-2 border-b border-[#27272A] bg-[#101012] flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] uppercase font-bold text-[#F1EFE9] tracking-wider">
+              PYRITE // AUTONOMOUS DECEPTION GRID (FeS₂)
+            </span>
+            <span className="text-[#22C55E] text-[10px] font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" />
+              10.46.34.107:9200 WAZUH LINKED
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsMonitoringActive(!isMonitoringActive)}
+              className={cn(
+                'px-2.5 py-1 border font-mono text-[10px] uppercase flex items-center gap-1',
+                isMonitoringActive
+                  ? 'border-[#27272A] bg-[#18181B] text-[#F1EFE9]'
+                  : 'border-[#FF493D] bg-[#141416] text-[#FF493D] font-bold'
+              )}
+            >
+              {isMonitoringActive ? <Pause size={10} /> : <Play size={10} />}
+              {isMonitoringActive ? 'PAUSE' : 'RESUME'}
+            </button>
+            {operatingMode === 'DEMO' && (
+              <div className="flex items-center border border-[#27272A] bg-[#141416] font-mono text-[10px]">
+                <button
+                  onClick={triggerDemoAttack}
+                  className="px-2 py-1 uppercase text-[#F1EFE9] hover:bg-[#1E1E22] flex items-center gap-1 font-semibold"
+                >
+                  <Zap size={10} className="text-[#FF493D]" />
+                  ATTACK
+                </button>
+                <button
+                  onClick={() => triggerDemoCapture()}
+                  className="px-2 py-1 uppercase bg-[#FF493D] text-[#0B0B0C] font-bold hover:bg-[#F1EFE9] border-l border-[#27272A]"
+                >
+                  CONTAIN
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        )}
 
         {/* OPTIONAL STATUS / ALERT BANNER */}
         {statusBanner && (

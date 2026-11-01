@@ -55,7 +55,7 @@ export default function LiveEventsPage() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-mono text-[9px] tracking-[0.14em] text-muted-ink uppercase">
-              Vyuha // Honeytrap
+              PYRITE (FeS₂) // Wazuh SIEM
             </p>
             <StatusPill tone={mode === "demo" ? "critical" : connected ? "live" : "critical"}>
               {mode === "demo" ? "Demo stream" : connected ? "Live stream" : "Disconnected"}

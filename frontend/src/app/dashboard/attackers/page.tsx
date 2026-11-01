@@ -37,7 +37,7 @@ export default function AttackersPage() {
       const search = query.toLowerCase()
       return (
         attacker.ip.toLowerCase().includes(search) ||
-        attacker.ja4h.toLowerCase().includes(search) ||
+        attacker.ja4h?.toLowerCase().includes(search) ||
         attacker.honeypots.some((honeypot) =>
           honeypot.toLowerCase().includes(search)
         )
@@ -62,7 +62,7 @@ export default function AttackersPage() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-mono text-[9px] tracking-[0.14em] text-muted-ink uppercase">
-              Vyuha // Honeytrap
+              PYRITE (FeS₂) // Attackers
             </p>
             <StatusPill tone={mode === "demo" ? "critical" : connected ? "live" : "critical"}>
               {mode === "demo" ? "Simulated attackers" : connected ? "Live attackers" : "Disconnected"}

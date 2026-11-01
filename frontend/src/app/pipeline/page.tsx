@@ -5,9 +5,9 @@ import { CommandCta } from "@/components/landing/command-cta"
 import { SubpageShell } from "@/components/landing/subpage-shell"
 
 export const metadata: Metadata = {
-  title: "Pipeline — VYUHA",
+  title: "Pipeline — PYRITE (FeS₂)",
   description:
-    "The VYUHA system pipeline: controlled attack simulation, polymorphic labyrinth, Wazuh detection, FastAPI intelligence, and SOC command.",
+    "The PYRITE system pipeline: controlled attack simulation, polymorphic labyrinth, Wazuh detection, FastAPI intelligence, and SOC command.",
 }
 
 export default function PipelinePage() {

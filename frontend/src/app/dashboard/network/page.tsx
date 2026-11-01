@@ -31,7 +31,7 @@ export default function NetworkIntelligencePage() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-mono text-[9px] tracking-[0.14em] text-muted-ink uppercase">
-              Vyuha // Honeytrap
+              PYRITE (FeS₂) // Labyrinth
             </p>
             <StatusPill tone={mode === "demo" ? "critical" : connected ? "live" : "critical"}>
               {mode === "demo" ? "Demo topology" : connected ? "Live topology" : "Disconnected"}

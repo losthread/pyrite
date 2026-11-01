@@ -7,7 +7,7 @@ import { palette } from "@/config/labyrinthConfig"
 export function WordmarkMasthead() {
   return (
     <section
-      aria-label="Vyuha"
+      aria-label="Pyrite"
       className="relative border-b border-ink bg-paper"
     >
       <div className="grid lg:grid-cols-[minmax(0,1.55fr)_minmax(360px,0.75fr)]">
@@ -15,7 +15,7 @@ export function WordmarkMasthead() {
           <div className="flex items-center justify-between border-b border-ink px-3 py-2 sm:px-5">
             <span className="micro-sm flex items-center gap-2 font-medium">
               <span className="size-1.5 bg-signal" />
-              Vyuha / Chakravyuha
+              PYRITE // FOOL'S GOLD DECEPTION GRID (FeS₂)
             </span>
             <span className="micro-sm text-muted-ink">Morph-v2.0</span>
           </div>
@@ -24,7 +24,7 @@ export function WordmarkMasthead() {
             <HalftoneWordmarkFooter
               as="div"
               chrome={false}
-              wordmark="vyuha"
+              wordmark="pyrite"
               preset="paper"
               palette={{
                 background: palette.background,
@@ -44,9 +44,9 @@ export function WordmarkMasthead() {
 
           <div className="flex items-center justify-between border-t border-ink px-3 py-2 sm:px-5">
             <span className="micro-sm text-muted-ink">
-              Active deception platform
+              Autonomous adversary labyrinth
             </span>
-            <span className="micro-sm text-muted-ink">Rev 2.6 / 2026</span>
+            <span className="micro-sm text-muted-ink">FeS₂ // Rev 2.6</span>
           </div>
         </div>
 
@@ -54,20 +54,20 @@ export function WordmarkMasthead() {
           <div>
             <div className="mb-7 flex items-center gap-3">
               <span className="h-px w-8 bg-signal" />
-              <span className="micro font-medium">Deception engine / 001</span>
+              <span className="micro font-medium">PYRITE // FOOL'S GOLD ENGINE 001</span>
             </div>
 
-            <h1 className="display-tight max-w-[11ch] text-[clamp(2.65rem,4.2vw,5.2rem)]">
-              Easy to breach.
+            <h1 className="display-tight max-w-[12ch] text-[clamp(2.4rem,3.8vw,4.6rem)]">
+              Glitters like gold.
               <span className="mt-1 block text-signal">
-                Impossible to escape.
+                Traps like iron.
               </span>
             </h1>
 
             <p className="mt-6 max-w-[38ch] text-sm leading-relaxed text-muted-ink sm:text-[0.95rem]">
               An ephemeral, self-mutating 4-stage deception labyrinth that
               weaponizes attacker greed and tracks syndicate collusion through
-              stateless HMAC breadcrumbs.
+              stateless Pyrite Nuggets (HMAC crumbs).
             </p>
           </div>
 
@@ -77,7 +77,7 @@ export function WordmarkMasthead() {
                 href="/dashboard"
                 className="group flex h-11 items-center justify-between border border-ink bg-ink px-4 text-paper transition-colors hover:bg-signal hover:text-signal-ink"
               >
-                <span className="micro font-semibold">Launch dashboard</span>
+                <span className="micro font-semibold">Launch SOC Dashboard</span>
                 <ArrowUpRight
                   className="size-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
                   strokeWidth={1.5}
@@ -98,7 +98,7 @@ export function WordmarkMasthead() {
             <dl className="mt-7 grid grid-cols-3 border-t border-ink pt-4">
               {[
                 ["04", "Stages"],
-                ["03", "Crumbs"],
+                ["03", "Nuggets"],
                 ["01", "Exit"],
               ].map(([value, label]) => (
                 <div

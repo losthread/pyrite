@@ -82,7 +82,7 @@ export function CommandCta() {
           <p className="micro-sm text-muted-ink">
             Mission clock / 00:18:42
             <br />
-            Build / VYUHA-SOC-2.6.0
+            Build / PYRITE-SOC-2.6.0 (FeS₂)
           </p>
         </div>
       </div>
