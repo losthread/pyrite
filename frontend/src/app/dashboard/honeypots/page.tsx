@@ -28,10 +28,19 @@ const statusLabel: Record<HoneypotStatus, string> = {
 
 export default function HoneypotsPage() {
   const { mode, connection, snapshot } = useDashboardTelemetry()
-  const [selectedId, setSelectedId] = React.useState<string | null>(
-    snapshot.honeypots[0]?.id ?? null
-  )
+  const [selectedId, setSelectedId] = React.useState<string | null>(null)
+
   const selected = snapshot.honeypots.find((item) => item.id === selectedId)
+
+  // Keep the inspector populated: when live telemetry arrives (or the current
+  // selection disappears) select the first visible decoy.
+  React.useEffect(() => {
+    if (snapshot.honeypots.length === 0) return
+    if (!snapshot.honeypots.some((honeypot) => honeypot.id === selectedId)) {
+      setSelectedId(snapshot.honeypots[0].id)
+    }
+  }, [snapshot.honeypots, selectedId])
+
   const connected = mode === "demo" || connection === "connected"
 
   return (

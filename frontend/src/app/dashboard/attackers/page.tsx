@@ -25,9 +25,7 @@ export default function AttackersPage() {
   const [query, setQuery] = React.useState("")
   const [severity, setSeverity] = React.useState<Severity | "all">("all")
   const [sort, setSort] = React.useState<SortKey>("attempts")
-  const [selectedId, setSelectedId] = React.useState<string | null>(
-    snapshot.attackers[0]?.id ?? null
-  )
+  const [selectedId, setSelectedId] = React.useState<string | null>(null)
 
   const connected = mode === "demo" || connection === "connected"
   const filtered = snapshot.attackers
@@ -52,6 +50,16 @@ export default function AttackersPage() {
     })
 
   const selected = snapshot.attackers.find((item) => item.id === selectedId)
+
+  // Keep the detail inspector populated: when live telemetry arrives (or the
+  // current selection ages out of the window) select the top visible attacker.
+  React.useEffect(() => {
+    if (filtered.length === 0) return
+    if (!filtered.some((attacker) => attacker.id === selectedId)) {
+      setSelectedId(filtered[0].id)
+    }
+  }, [filtered, selectedId])
+
   const relatedEvents = selected
     ? snapshot.events.filter((event) => event.sourceIp === selected.ip)
     : []

@@ -143,15 +143,6 @@ def _stage_target(stage: int) -> tuple[str, str]:
     return STAGE_HONEYPOT.get(stage, ("hp-web", "web-decoy"))
 
 
-def _touched_honeypots(stage: int) -> list[str]:
-    names = ["web-decoy"]
-    if stage >= 3:
-        names.append("cowrie-ssh")
-    if stage >= 4:
-        names.append("vault-decoy")
-    return names
-
-
 def get_all_db_events(limit: int = 5000) -> list[dict[str, Any]]:
     """Read every persisted telemetry frame (oldest rows are trimmed by LIMIT)."""
     try:
@@ -332,8 +323,6 @@ def build_snapshot() -> dict[str, Any]:
     total_attacks = max(
         total_db_events, sum(s.get("command_count", 0) for s in sessions)
     )
-    active_attackers = len([s for s in sessions if not s.get("plausible_waf_drop")])
-    captured_sessions = len([s for s in sessions if s.get("plausible_waf_drop")])
     critical_alerts = critical_db_events
 
     def interactions_for(honeypot_id: str) -> int:
@@ -382,19 +371,107 @@ def build_snapshot() -> dict[str, Any]:
     attackers: list[dict[str, Any]] = []
     events: list[dict[str, Any]] = []
 
-    for idx, session in enumerate(sessions):
-        att_id = f"attacker-real-{idx + 1}"
-        ip = (
-            session.get("current_ip")
-            or session.get("initial_ip")
-            or "185.220.101.4"
+    # Reconstruct attacker entities from the recent telemetry window. Shadow
+    # worlds are in-memory, so a backend restart must not wipe attacker nodes:
+    # any recent event recreates the attacker with correct honeypot edges, and
+    # a live session (when present) enriches it with threat score and status.
+    attacker_groups: dict[str, dict[str, Any]] = {}
+    for raw in raw_events:
+        attacker = raw.get("attacker", {}) or {}
+        ip = str(attacker.get("ip") or "").strip()
+        if not ip or ip == "SYSTEM_INTERNAL":
+            continue
+        stage = _event_stage(raw)
+        ts_ms = _event_ts_ms(raw)
+        group = attacker_groups.setdefault(
+            ip,
+            {
+                "ip": ip,
+                "ja4h": attacker.get("ja4h"),
+                "events": 0,
+                "stages": set(),
+                "first_ms": ts_ms,
+                "last_ms": ts_ms,
+                "max_level": 0,
+            },
         )
-        sev = "critical" if session.get("threat_score", 0) >= 80 else "suspicious"
-        stage = int(session.get("highest_stage", 0) or 0)
-        last_seen = session.get("last_seen", now_iso)
+        group["events"] += 1
+        group["stages"].add(stage)
+        group["first_ms"] = min(group["first_ms"], ts_ms)
+        group["last_ms"] = max(group["last_ms"], ts_ms)
+        group["max_level"] = max(group["max_level"], _event_level(raw))
+        if attacker.get("ja4h") and not group["ja4h"]:
+            group["ja4h"] = attacker.get("ja4h")
+
+    sessions_by_ja4h = {str(s.get("ja4h")): s for s in sessions if s.get("ja4h")}
+    sessions_by_ip = {
+        str(s.get("current_ip") or s.get("initial_ip") or ""): s
+        for s in sessions
+    }
+
+    # Sessions with no events inside the window still surface (freshly idle).
+    for session in sessions:
+        ip = str(session.get("current_ip") or session.get("initial_ip") or "")
+        if ip and ip not in attacker_groups:
+            attacker_groups[ip] = {
+                "ip": ip,
+                "ja4h": session.get("ja4h"),
+                "events": 0,
+                "stages": {int(session.get("highest_stage", 0) or 0)},
+                "first_ms": _session_epoch_ms(session),
+                "last_ms": _session_epoch_ms(session),
+                "max_level": 0,
+            }
+
+    # Most recent attacker first so the graph and tables lead with live activity.
+    ordered_attackers = sorted(
+        attacker_groups.values(), key=lambda g: g["last_ms"], reverse=True
+    )
+
+    for idx, group in enumerate(ordered_attackers):
+        ip = group["ip"]
+        # Stable per-IP id so graph nodes and selections survive snapshot polls.
+        att_id = f"attacker-{re.sub(r'[^0-9a-zA-Z]+', '-', ip).strip('-')}"
+        session = sessions_by_ja4h.get(str(group["ja4h"])) or sessions_by_ip.get(ip)
+        session_stage = (
+            int(session.get("highest_stage", 0) or 0) if session else 0
+        )
+        stages = set(group["stages"]) | {session_stage}
+        highest_stage = max(stages) if stages else 0
+
+        if session:
+            first_seen = session.get("last_seen", now_iso)
+            last_seen = session.get("last_seen", now_iso)
+        else:
+            first_seen = datetime.fromtimestamp(
+                group["first_ms"] / 1000, tz=timezone.utc
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            last_seen = datetime.fromtimestamp(
+                group["last_ms"] / 1000, tz=timezone.utc
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        critical = (session and session.get("threat_score", 0) >= 80) or (
+            group["max_level"] >= 13
+        )
+        sev = "critical" if critical else "suspicious"
+        contained = bool(session and session.get("plausible_waf_drop"))
+        attempts = max(
+            group["events"],
+            (session.get("command_count", 0) if session else 0),
+        )
         protocols = ["tcp", "http"]
-        if stage >= 3:
+        if highest_stage >= 3:
             protocols.append("ssh")
+        touched: list[str] = []
+        if any(stage in (1, 2) for stage in stages) or highest_stage <= 2:
+            touched.append("web-decoy")
+        if highest_stage >= 3:
+            touched.append("cowrie-ssh")
+        if highest_stage >= 4:
+            touched.append("vault-decoy")
+        if not touched:
+            touched = ["web-decoy"]
+
         nodes.append(
             {
                 "id": att_id,
@@ -402,29 +479,26 @@ def build_snapshot() -> dict[str, Any]:
                 "ip": ip,
                 "kind": "attacker",
                 "severity": sev,
-                "status": "Contained"
-                if session.get("plausible_waf_drop")
-                else "Active",
+                "status": "Contained" if contained else "Active",
                 "x": 120,
                 "y": 150 + (idx * 90),
                 "protocols": protocols,
-                "connectionCount": session.get("command_count", 0),
-                "firstSeen": last_seen,
+                "connectionCount": attempts,
+                "firstSeen": first_seen,
                 "lastSeen": last_seen,
-                "associatedHoneypot": _stage_target(stage)[1],
+                "associatedHoneypot": touched[-1],
                 "threatClassification": "Adversary Session",
             }
         )
-        touched = _touched_honeypots(stage)
         for hp_name in touched:
             connections.append(
                 {
-                    "id": f"e-real-{idx + 1}-{HONEYPOT_IDS[hp_name]}",
+                    "id": f"{att_id}-{HONEYPOT_IDS[hp_name]}",
                     "source": att_id,
                     "target": HONEYPOT_IDS[hp_name],
                     "severity": sev,
                     "protocol": "ssh" if hp_name == "cowrie-ssh" else "http",
-                    "packets": session.get("command_count", 0),
+                    "packets": attempts,
                     "lastSeen": last_seen,
                     "label": "Observed Intrusion",
                 }
@@ -433,18 +507,20 @@ def build_snapshot() -> dict[str, Any]:
             {
                 "id": att_id,
                 "ip": ip,
-                "firstSeen": last_seen,
+                "firstSeen": first_seen,
                 "lastSeen": last_seen,
-                "attempts": session.get("command_count", 0),
+                "attempts": attempts,
                 "honeypots": touched,
                 "protocols": protocols,
                 "severity": sev,
-                "status": "contained"
-                if session.get("plausible_waf_drop")
-                else "active",
-                "ja4h": session.get("ja4h", "not-captured"),
+                "status": "contained" if contained else "active",
+                "ja4h": (session.get("ja4h") if session else group["ja4h"])
+                or "not-captured",
             }
         )
+
+    active_attackers = sum(1 for a in attackers if a["status"] == "active")
+    captured_sessions = sum(1 for a in attackers if a["status"] == "contained")
 
     for raw in raw_events:
         action = raw.get("action", {}) or {}
