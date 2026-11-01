@@ -21,36 +21,22 @@ const ranges: Array<{ id: Range; label: string }> = [
   { id: "7d", label: "Last 7 days" },
 ]
 
-const sevenDayVolume = [
-  { label: "25 Oct", value: 165 },
-  { label: "26 Oct", value: 184 },
-  { label: "27 Oct", value: 172 },
-  { label: "28 Oct", value: 191 },
-  { label: "29 Oct", value: 203 },
-  { label: "30 Oct", value: 187 },
-  { label: "31 Oct", value: 182 },
-]
-
-const hourVolume = [
-  { label: "09:30", value: 8 },
-  { label: "09:40", value: 12 },
-  { label: "09:50", value: 18 },
-  { label: "10:00", value: 22 },
-  { label: "10:10", value: 16 },
-  { label: "10:20", value: 19 },
-]
+const seriesKey: Record<Range, "1H" | "24H" | "7D"> = {
+  "1h": "1H",
+  "24h": "24H",
+  "7d": "7D",
+}
 
 export default function AnalyticsPage() {
   const { mode, connection, snapshot } = useDashboardTelemetry()
   const [range, setRange] = React.useState<Range>("24h")
   const connected = mode === "demo" || connection === "connected"
 
+  const series = snapshot.analytics.series?.[seriesKey[range]] ?? []
   const volume =
-    range === "1h"
-      ? hourVolume
-      : range === "7d"
-        ? sevenDayVolume
-        : snapshot.analytics.volume
+    series.length > 0
+      ? series.map((point) => ({ label: point.time, value: point.attacks }))
+      : snapshot.analytics.volume
 
   const total = volume.reduce((sum, item) => sum + item.value, 0)
   const peak = Math.max(0, ...volume.map((item) => item.value))
@@ -131,8 +117,8 @@ export default function AnalyticsPage() {
         </Panel>
 
         <Panel
-          title="Captured sessions"
-          subtitle="Retained by decoy systems"
+          title="Active sessions"
+          subtitle="Unique attackers per 5-minute slice"
           className="md:col-span-2 xl:col-span-1"
         >
           <div className="p-3">

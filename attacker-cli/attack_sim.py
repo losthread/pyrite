@@ -31,7 +31,7 @@ BG_GREEN = "\033[42m"
 STATE_FILE = os.path.join(os.path.dirname(__file__), ".attacker_state.json")
 
 state = {
-    "target_url": "http://localhost:8000",
+    "target_url": os.getenv("VYUH_BASE_URL", "http://localhost:8003"),
     "attacker_ip": "185.220.101.4",  # Pre-seeded for East-West correlation demo
     "client_fingerprint_override": None,
     "active_seed": "Morph-v1.0 (Fintech-Git-SQLi)",

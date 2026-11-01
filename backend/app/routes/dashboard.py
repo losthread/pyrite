@@ -5,6 +5,7 @@ import os
 import re
 import sqlite3
 import time
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
@@ -65,6 +66,23 @@ HONEYPOTS = [
     },
 ]
 
+# Which decoy receives the telemetry for each stage of the attack chain.
+STAGE_HONEYPOT = {
+    1: ("hp-web", "web-decoy"),
+    2: ("hp-web", "web-decoy"),
+    3: ("hp-cowrie", "cowrie-ssh"),
+    4: ("hp-vault", "vault-decoy"),
+}
+
+HONEYPOT_STAGES = {
+    "hp-cowrie": {3},
+    "hp-web": {1, 2},
+    "hp-graphql": set(),
+    "hp-vault": {4},
+}
+
+HONEYPOT_IDS = {hp["name"]: hp["id"] for hp in HONEYPOTS}
+
 
 def _event_epoch_ms(raw: dict[str, Any]) -> int:
     event_id = str(raw.get("eventId", ""))
@@ -77,31 +95,86 @@ def _event_epoch_ms(raw: dict[str, Any]) -> int:
     return 0
 
 
-def get_real_db_events() -> tuple[int, int, list[dict[str, Any]]]:
+def _event_ts_ms(raw: dict[str, Any]) -> int:
+    """Best-effort event timestamp: embedded epoch id, else parsed wall clock."""
+    epoch = _event_epoch_ms(raw)
+    if epoch > 0:
+        return epoch
+
+    value = str(raw.get("timestamp", "")).strip()
+    if not value:
+        return 0
+
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            parsed = datetime.strptime(value, fmt).replace(tzinfo=timezone.utc)
+            return int(parsed.timestamp() * 1000)
+        except ValueError:
+            continue
+
+    for fmt in ("%H:%M:%S.%f", "%H:%M:%S"):
+        try:
+            parsed = datetime.strptime(value, fmt)
+            now = datetime.now(timezone.utc)
+            parsed = parsed.replace(
+                year=now.year, month=now.month, day=now.day, tzinfo=timezone.utc
+            )
+            return int(parsed.timestamp() * 1000)
+        except ValueError:
+            continue
+    return 0
+
+
+def _event_level(raw: dict[str, Any]) -> int:
+    try:
+        return int((raw.get("wazuh") or {}).get("level") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _event_stage(raw: dict[str, Any]) -> int:
+    try:
+        return int(raw.get("stage") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _stage_target(stage: int) -> tuple[str, str]:
+    return STAGE_HONEYPOT.get(stage, ("hp-web", "web-decoy"))
+
+
+def _touched_honeypots(stage: int) -> list[str]:
+    names = ["web-decoy"]
+    if stage >= 3:
+        names.append("cowrie-ssh")
+    if stage >= 4:
+        names.append("vault-decoy")
+    return names
+
+
+def get_all_db_events(limit: int = 5000) -> list[dict[str, Any]]:
+    """Read every persisted telemetry frame (oldest rows are trimmed by LIMIT)."""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT full_json FROM telemetry_events ORDER BY rowid DESC LIMIT 200")
+        cursor.execute(
+            "SELECT full_json FROM telemetry_events ORDER BY rowid DESC LIMIT ?",
+            (limit,),
+        )
         rows = cursor.fetchall()
         conn.close()
-
-        now_ms = int(time.time() * 1000)
-        recent: list[dict[str, Any]] = []
-        for (payload,) in rows:
-            try:
-                raw = json.loads(payload)
-            except Exception:
-                continue
-            if now_ms - _event_epoch_ms(raw) <= EVENT_WINDOW_MS:
-                recent.append(raw)
-
-        total_count = len(recent)
-        critical_count = sum(
-            1 for r in recent if (r.get("wazuh", {}) or {}).get("level", 0) >= 13
-        )
-        return total_count, critical_count, recent
     except Exception:
-        return 0, 0, []
+        return []
+
+    events: list[dict[str, Any]] = []
+    for (payload,) in rows:
+        try:
+            raw = json.loads(payload)
+        except Exception:
+            continue
+        if isinstance(raw, dict):
+            events.append(raw)
+    return events
 
 
 def _severity(level: int) -> str:
@@ -123,26 +196,154 @@ def _session_is_recent(session: dict[str, Any], now_epoch: float) -> bool:
         return False
 
 
-def build_snapshot() -> dict[str, Any]:
-    now_iso = datetime.now(timezone.utc).isoformat()
-    total_db_events, critical_db_events, raw_events = get_real_db_events()
-    sessions = [
-        s
-        for s in get_all_shadow_worlds()
-        if _session_is_recent(s, time.time())
+def _session_epoch_ms(session: dict[str, Any]) -> int:
+    try:
+        last_seen = datetime.strptime(
+            str(session.get("last_seen", "")), "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc)
+        return int(last_seen.timestamp() * 1000)
+    except Exception:
+        return 0
+
+
+def _build_analytics(
+    all_events: list[dict[str, Any]],
+    recent_events: list[dict[str, Any]],
+    sessions: list[dict[str, Any]],
+    now_ms: int,
+) -> dict[str, Any]:
+    """Derive every chart series from persisted telemetry, never from constants."""
+    contained_times = [
+        _session_epoch_ms(s)
+        for s in sessions
+        if s.get("plausible_waf_drop") and _session_epoch_ms(s) > 0
     ]
 
-    total_attacks = max(total_db_events, sum(s.get("command_count", 0) for s in sessions))
+    def build_series(range_ms: int, buckets: int, label_fmt: str) -> list[dict[str, Any]]:
+        bucket_ms = max(1, range_ms // buckets)
+        start = now_ms - bucket_ms * buckets
+        series: list[dict[str, Any]] = []
+        for index in range(buckets):
+            lower = start + index * bucket_ms
+            upper = lower + bucket_ms
+            bucket = [
+                event
+                for event in all_events
+                if lower <= _event_ts_ms(event) < upper
+            ]
+            label = datetime.fromtimestamp(lower / 1000, tz=timezone.utc).strftime(
+                label_fmt
+            )
+            series.append(
+                {
+                    "time": label,
+                    "attacks": len(bucket),
+                    "critical": sum(1 for e in bucket if _event_level(e) >= 13),
+                    "contained": sum(
+                        1 for ts in contained_times if lower <= ts < upper
+                    ),
+                }
+            )
+        return series
+
+    series = {
+        "1H": build_series(60 * 60_000, 6, "%H:%M"),
+        "24H": build_series(24 * 60 * 60_000, 12, "%H:%M"),
+        "7D": build_series(7 * 24 * 60 * 60_000, 7, "%a"),
+    }
+
+    severity_counts = {"Critical": 0, "Suspicious": 0, "Informational": 0}
+    honeypot_counts: Counter[str] = Counter()
+    protocol_counts: Counter[str] = Counter()
+    for raw in recent_events:
+        level = _event_level(raw)
+        if level >= 13:
+            severity_counts["Critical"] += 1
+        elif level >= 8:
+            severity_counts["Suspicious"] += 1
+        else:
+            severity_counts["Informational"] += 1
+
+        stage = _event_stage(raw)
+        honeypot_counts[_stage_target(stage)[1]] += 1
+        protocol_counts["SSH" if stage == 3 else "HTTP"] += 1
+
+    # Unique attacker IPs per 5-minute slice of the live window.
+    session_series: list[dict[str, Any]] = []
+    slice_ms = 5 * 60_000
+    start = now_ms - slice_ms * 6
+    for index in range(6):
+        lower = start + index * slice_ms
+        upper = lower + slice_ms
+        ips = {
+            str((raw.get("attacker") or {}).get("ip") or "")
+            for raw in recent_events
+            if lower <= _event_ts_ms(raw) < upper
+        }
+        ips.discard("")
+        session_series.append(
+            {
+                "label": datetime.fromtimestamp(
+                    lower / 1000, tz=timezone.utc
+                ).strftime("%H:%M"),
+                "value": len(ips),
+            }
+        )
+
+    one_hour = [{"label": point["time"], "value": point["attacks"]} for point in series["1H"]]
+
+    return {
+        "series": series,
+        "volume": one_hour,
+        "severity": [
+            {"label": label, "value": value}
+            for label, value in severity_counts.items()
+        ],
+        "targetedHoneypots": [
+            {"label": label, "value": value}
+            for label, value in honeypot_counts.most_common()
+            if value > 0
+        ],
+        "protocols": [
+            {"label": label, "value": value}
+            for label, value in protocol_counts.most_common()
+            if value > 0
+        ],
+        "sessions": session_series,
+    }
+
+
+def build_snapshot() -> dict[str, Any]:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    now_ms = int(time.time() * 1000)
+    all_db_events = get_all_db_events()
+    raw_events = [
+        raw
+        for raw in all_db_events
+        if 0 < now_ms - _event_ts_ms(raw) <= EVENT_WINDOW_MS
+    ]
+    total_db_events = len(raw_events)
+    critical_db_events = sum(1 for r in raw_events if _event_level(r) >= 13)
+
+    sessions = [
+        s for s in get_all_shadow_worlds() if _session_is_recent(s, time.time())
+    ]
+
+    total_attacks = max(
+        total_db_events, sum(s.get("command_count", 0) for s in sessions)
+    )
     active_attackers = len([s for s in sessions if not s.get("plausible_waf_drop")])
     captured_sessions = len([s for s in sessions if s.get("plausible_waf_drop")])
     critical_alerts = critical_db_events
 
+    def interactions_for(honeypot_id: str) -> int:
+        stages = HONEYPOT_STAGES.get(honeypot_id, set())
+        return sum(1 for raw in raw_events if _event_stage(raw) in stages)
+
     # Decoy fleet + Wazuh manager (always present on the grid).
     nodes: list[dict[str, Any]] = []
     for hp in HONEYPOTS:
-        interactions = sum(
-            1 for r in raw_events if r.get("stage") in (2, 3, 4) and hp["id"] in ("hp-cowrie", "hp-web", "hp-graphql", "hp-vault")
-        )
+        interactions = interactions_for(hp["id"])
         nodes.append(
             {
                 "id": hp["id"],
@@ -181,12 +382,19 @@ def build_snapshot() -> dict[str, Any]:
     attackers: list[dict[str, Any]] = []
     events: list[dict[str, Any]] = []
 
-    for idx, s in enumerate(sessions):
+    for idx, session in enumerate(sessions):
         att_id = f"attacker-real-{idx + 1}"
-        ip = s.get("current_ip") or s.get("initial_ip") or "185.220.101.4"
-        sev = "critical" if s.get("threat_score", 0) >= 80 else "suspicious"
-        stage = s.get("highest_stage", 0)
-        target = "hp-vault" if stage >= 4 else "hp-cowrie"
+        ip = (
+            session.get("current_ip")
+            or session.get("initial_ip")
+            or "185.220.101.4"
+        )
+        sev = "critical" if session.get("threat_score", 0) >= 80 else "suspicious"
+        stage = int(session.get("highest_stage", 0) or 0)
+        last_seen = session.get("last_seen", now_iso)
+        protocols = ["tcp", "http"]
+        if stage >= 3:
+            protocols.append("ssh")
         nodes.append(
             {
                 "id": att_id,
@@ -194,43 +402,47 @@ def build_snapshot() -> dict[str, Any]:
                 "ip": ip,
                 "kind": "attacker",
                 "severity": sev,
-                "status": "Contained" if s.get("plausible_waf_drop") else "Active",
+                "status": "Contained"
+                if session.get("plausible_waf_drop")
+                else "Active",
                 "x": 120,
                 "y": 150 + (idx * 90),
-                "protocols": ["tcp", "ssh"],
-                "connectionCount": s.get("command_count", 0),
-                "firstSeen": s.get("last_seen", now_iso),
-                "lastSeen": s.get("last_seen", now_iso),
-                "associatedHoneypot": "cowrie-ssh",
+                "protocols": protocols,
+                "connectionCount": session.get("command_count", 0),
+                "firstSeen": last_seen,
+                "lastSeen": last_seen,
+                "associatedHoneypot": _stage_target(stage)[1],
                 "threatClassification": "Adversary Session",
             }
         )
-        connections.append(
-            {
-                "id": f"e-real-{idx + 1}",
-                "source": att_id,
-                "target": target,
-                "severity": sev,
-                "protocol": "tcp",
-                "packets": s.get("command_count", 0),
-                "lastSeen": s.get("last_seen", now_iso),
-                "label": "Observed Intrusion",
-            }
-        )
+        touched = _touched_honeypots(stage)
+        for hp_name in touched:
+            connections.append(
+                {
+                    "id": f"e-real-{idx + 1}-{HONEYPOT_IDS[hp_name]}",
+                    "source": att_id,
+                    "target": HONEYPOT_IDS[hp_name],
+                    "severity": sev,
+                    "protocol": "ssh" if hp_name == "cowrie-ssh" else "http",
+                    "packets": session.get("command_count", 0),
+                    "lastSeen": last_seen,
+                    "label": "Observed Intrusion",
+                }
+            )
         attackers.append(
             {
                 "id": att_id,
                 "ip": ip,
-                "firstSeen": s.get("last_seen", now_iso),
-                "lastSeen": s.get("last_seen", now_iso),
-                "attempts": s.get("command_count", 0),
-                "honeypots": (
-                    ["cowrie-ssh", "vault-decoy"] if stage >= 4 else ["cowrie-ssh"]
-                ),
-                "protocols": ["tcp", "ssh"],
+                "firstSeen": last_seen,
+                "lastSeen": last_seen,
+                "attempts": session.get("command_count", 0),
+                "honeypots": touched,
+                "protocols": protocols,
                 "severity": sev,
-                "status": "contained" if s.get("plausible_waf_drop") else "active",
-                "ja4h": s.get("ja4h", "not-captured"),
+                "status": "contained"
+                if session.get("plausible_waf_drop")
+                else "active",
+                "ja4h": session.get("ja4h", "not-captured"),
             }
         )
 
@@ -238,14 +450,13 @@ def build_snapshot() -> dict[str, Any]:
         action = raw.get("action", {}) or {}
         attacker = raw.get("attacker", {}) or {}
         wazuh = raw.get("wazuh", {}) or {}
-        level = wazuh.get("level", 0)
-        stage = raw.get("stage", 0)
-        destination = {
-            1: "edge-gw-01",
-            2: "cowrie-ssh",
-            3: "shadow-shell",
-            4: "vault-decoy",
-        }.get(stage, "cowrie-ssh")
+        level = int(wazuh.get("level", 0) or 0)
+        stage = _event_stage(raw)
+        destination_id, destination = _stage_target(stage)
+        destination_ip = next(
+            (hp["ip"] for hp in HONEYPOTS if hp["id"] == destination_id),
+            "10.0.4.22",
+        )
         events.append(
             {
                 "id": raw.get("eventId", f"evt-{len(events)}"),
@@ -253,15 +464,21 @@ def build_snapshot() -> dict[str, Any]:
                 "severity": _severity(level),
                 "sourceIp": attacker.get("ip", "185.220.101.4"),
                 "destination": destination,
-                "destinationIp": "10.0.4.21",
+                "destinationIp": destination_ip,
                 "protocol": "ssh" if stage == 3 else "http",
                 "eventType": action.get("title", "SOC_TELEMETRY"),
-                "description": wazuh.get("description", action.get("title", "Telemetry Event")),
+                "description": wazuh.get(
+                    "description", action.get("title", "Telemetry Event")
+                ),
                 "ruleId": str(wazuh.get("ruleId", "100501")),
                 "ruleLevel": level,
-                "mitreId": (wazuh.get("mitreAttack", {}) or {}).get("id", "T1595"),
+                "mitreId": (wazuh.get("mitreAttack", {}) or {}).get(
+                    "id", "T1595"
+                ),
                 "mitreTactic": "Active Deception",
-                "mitreTechnique": (wazuh.get("mitreAttack", {}) or {}).get("name", "Deception Controls"),
+                "mitreTechnique": (wazuh.get("mitreAttack", {}) or {}).get(
+                    "name", "Deception Controls"
+                ),
                 "mitreAttack": wazuh.get("mitreAttack"),
                 "mitreD3fend": wazuh.get("mitreD3fend"),
                 "mitreEngage": wazuh.get("mitreEngage"),
@@ -273,9 +490,7 @@ def build_snapshot() -> dict[str, Any]:
 
     honeypots: list[dict[str, Any]] = []
     for hp in HONEYPOTS:
-        hp_events = sum(
-            1 for r in raw_events if r.get("stage") == 4 and hp["id"] == "hp-vault"
-        )
+        interactions = interactions_for(hp["id"])
         honeypots.append(
             {
                 "id": hp["id"],
@@ -283,14 +498,18 @@ def build_snapshot() -> dict[str, Any]:
                 "host": hp["host"],
                 "ip": hp["ip"],
                 "type": hp["type"],
-                "status": "capturing" if hp_events > 0 or (hp["id"] == "hp-cowrie" and total_attacks > 0) else "online",
-                "sessions": active_attackers if hp["id"] == "hp-cowrie" else 0,
-                "interactions": hp_events if hp["id"] == "hp-vault" else (total_attacks if hp["id"] == "hp-cowrie" else 0),
+                "status": "capturing" if interactions > 0 else "online",
+                "sessions": active_attackers if interactions > 0 else 0,
+                "interactions": interactions,
                 "lastActivity": now_iso,
-                "severity": "critical" if hp_events > 0 else ("suspicious" if total_attacks > 0 and hp["id"] == "hp-cowrie" else "info"),
+                "severity": "critical"
+                if hp["id"] == "hp-vault" and interactions > 0
+                else ("suspicious" if interactions > 0 else "info"),
                 "protocols": hp["protocols"],
             }
         )
+
+    analytics = _build_analytics(all_db_events, raw_events, sessions, now_ms)
 
     return {
         "generatedAt": now_iso,
@@ -312,20 +531,7 @@ def build_snapshot() -> dict[str, Any]:
         "attackers": attackers,
         "honeypots": honeypots,
         "alerts": [],
-        "analytics": {
-            "volume": [{"label": now_iso[11:16], "value": total_attacks}],
-            "severity": [
-                {"label": "Critical", "value": critical_alerts},
-                {"label": "Suspicious", "value": total_attacks - critical_alerts if total_attacks > critical_alerts else 0},
-                {"label": "Informational", "value": 0},
-            ],
-            "targetedHoneypots": [
-                {"label": "cowrie-ssh", "value": total_attacks},
-                {"label": "vault-decoy", "value": sum(1 for r in raw_events if r.get("stage") == 4)},
-            ],
-            "protocols": [{"label": "TCP", "value": total_attacks}],
-            "sessions": [{"label": now_iso[11:16], "value": active_attackers}],
-        },
+        "analytics": analytics,
     }
 
 

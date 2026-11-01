@@ -17,6 +17,25 @@ const API_BASE =
 
 const WS_BASE = API_BASE.replace(/^http/, "ws") + "/ws/soc?token=demo-analyst-bypass"
 
+const STAGE_HONEYPOT: Record<number, string> = {
+  1: "web-decoy",
+  2: "web-decoy",
+  3: "cowrie-ssh",
+  4: "vault-decoy",
+}
+
+function resolveHoneypotName(stage: any, endpoint?: string) {
+  const numeric = Number(stage)
+  if (STAGE_HONEYPOT[numeric]) return STAGE_HONEYPOT[numeric]
+  const haystack = String(endpoint || "").toLowerCase()
+  if (haystack.includes("vault") || haystack.includes("ledger")) return "vault-decoy"
+  if (haystack.includes("graphql")) return "graphql-decoy"
+  if (haystack.includes("shell") || haystack.includes("ssh") || haystack.includes("cowrie")) {
+    return "cowrie-ssh"
+  }
+  return "web-decoy"
+}
+
 export interface PyriteTelemetryValue {
   mode: DashboardMode
   connection: ConnectionState
@@ -138,15 +157,17 @@ export function PyriteTelemetryProvider({
             const attackerInfo = msgData.attacker || {}
             const wazuhRule = msgData.wazuh || {}
             const metrics = msgData.metrics || {}
+            const stage = Number(msgData.stage) || 0
+            const honeypotName = resolveHoneypotName(stage, eventPayload.endpoint)
 
             const newEvent: SecurityEvent = {
               id: msgData.eventId || `evt-${Date.now()}`,
               timestamp: new Date().toISOString(),
               severity: wazuhRule.level >= 13 ? "critical" : wazuhRule.level >= 8 ? "suspicious" : "info",
               sourceIp: attackerInfo.ip || "185.220.101.4",
-              destination: eventPayload.endpoint || "honeypot",
+              destination: honeypotName,
               destinationIp: "10.0.4.21",
-              protocol: "TCP",
+              protocol: stage === 3 ? "SSH" : "HTTP",
               eventType: eventPayload.title || "active_deception_trap",
               description: wazuhRule.description || eventPayload.title || "Deception event recorded",
               ruleId: String(wazuhRule.ruleId || "100501"),
@@ -154,7 +175,7 @@ export function PyriteTelemetryProvider({
               mitreId: wazuhRule.mitreAttack?.id || "T1595",
               mitreTactic: "Active Deception",
               mitreTechnique: wazuhRule.mitreAttack?.name || "Deception Controls",
-              honeypot: eventPayload.endpoint || "cowrie-ssh",
+              honeypot: honeypotName,
               sessionId: attackerInfo.ja4h,
               raw: msgData,
             }
@@ -201,11 +222,15 @@ export function PyriteTelemetryProvider({
   React.useEffect(() => {
     fetchLiveState()
     connectWebSocket()
+    const pollId = setInterval(fetchLiveState, 15000)
 
     return () => {
+      clearInterval(pollId)
       clearTimeout(reconnectTimeoutRef.current)
       if (socketRef.current) {
+        socketRef.current.onclose = null
         socketRef.current.close()
+        socketRef.current = null
       }
     }
   }, [fetchLiveState, connectWebSocket])

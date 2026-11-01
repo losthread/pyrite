@@ -129,7 +129,15 @@ export interface DashboardMetrics {
   criticalAlerts: number
 }
 
+export interface AnalyticsSeriesPoint {
+  time: string
+  attacks: number
+  critical: number
+  contained: number
+}
+
 export interface DashboardAnalytics {
+  series?: Partial<Record<"1H" | "24H" | "7D", AnalyticsSeriesPoint[]>>
   volume: TimePoint[]
   severity: NamedValue[]
   targetedHoneypots: NamedValue[]

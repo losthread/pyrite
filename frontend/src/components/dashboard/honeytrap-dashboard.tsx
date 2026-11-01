@@ -129,6 +129,36 @@ const formatEventTime = (value?: string) => {
   ).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')} UTC`;
 };
 
+// Attack-chain stage -> the decoy that actually receives that traffic. The
+// network graph only draws attacker edges when the target id matches a node id,
+// so every live frame must resolve to one of these.
+const STAGE_HONEYPOT: Record<number, { id: string; name: string }> = {
+  1: { id: 'hp-web', name: 'web-decoy' },
+  2: { id: 'hp-web', name: 'web-decoy' },
+  3: { id: 'hp-cowrie', name: 'cowrie-ssh' },
+  4: { id: 'hp-vault', name: 'vault-decoy' },
+};
+
+const resolveStageHoneypot = (stage: any, endpoint?: string) => {
+  const numeric = Number(stage);
+  if (STAGE_HONEYPOT[numeric]) return STAGE_HONEYPOT[numeric];
+  const haystack = String(endpoint || '').toLowerCase();
+  if (haystack.includes('vault') || haystack.includes('ledger')) {
+    return { id: 'hp-vault', name: 'vault-decoy' };
+  }
+  if (haystack.includes('graphql')) {
+    return { id: 'hp-graphql', name: 'graphql-decoy' };
+  }
+  if (
+    haystack.includes('shell') ||
+    haystack.includes('ssh') ||
+    haystack.includes('cowrie')
+  ) {
+    return { id: 'hp-cowrie', name: 'cowrie-ssh' };
+  }
+  return { id: 'hp-web', name: 'web-decoy' };
+};
+
 const TOKENS = {
   bg: '#F1EFE9',
   surface: '#D8D5CE',
@@ -1752,6 +1782,10 @@ export default function App({
   const [attackers, setAttackers] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [totalAttacksCount, setTotalAttacksCount] = useState(0);
+  const [analyticsSeries, setAnalyticsSeries] = useState<any>(ANALYTICS_SERIES);
+  const [analyticsSeverity, setAnalyticsSeverity] = useState<any[]>([]);
+  const [analyticsProtocols, setAnalyticsProtocols] = useState<any[]>([]);
+  const [analyticsHoneypots, setAnalyticsHoneypots] = useState<any[]>([]);
   const [statusBanner, setStatusBanner] = useState<any>(null);
 
   // Graph & Inspector State
@@ -2196,6 +2230,27 @@ export default function App({
             0
           )
       );
+
+      // 4. Analytics — every series comes from persisted telemetry, never constants.
+      const analytics = snapshot.analytics || {};
+      if (analytics.series) {
+        setAnalyticsSeries({
+          '1H': analytics.series['1H'] || ANALYTICS_SERIES['1H'],
+          '24H': analytics.series['24H'] || ANALYTICS_SERIES['24H'],
+          '7D': analytics.series['7D'] || ANALYTICS_SERIES['7D'],
+        });
+      }
+      setAnalyticsSeverity(
+        Array.isArray(analytics.severity) ? analytics.severity : []
+      );
+      setAnalyticsProtocols(
+        Array.isArray(analytics.protocols) ? analytics.protocols : []
+      );
+      setAnalyticsHoneypots(
+        Array.isArray(analytics.targetedHoneypots)
+          ? analytics.targetedHoneypots
+          : []
+      );
     } catch (e) {
       // Backend offline — leave the last known live state untouched.
     }
@@ -2224,7 +2279,22 @@ export default function App({
   // ==========================================================================
   // LIVE BACKEND WEBSOCKET INTEGRATION (Never fabricates events)
   // ==========================================================================
+  const liveSocketRef = useRef<WebSocket | null>(null);
+  const liveReconnectRef = useRef<any>(null);
+  const intentionalCloseRef = useRef(false);
+
   const initiateLiveConnection = useCallback(() => {
+    intentionalCloseRef.current = false;
+    clearTimeout(liveReconnectRef.current);
+
+    if (liveSocketRef.current) {
+      try {
+        liveSocketRef.current.onclose = null;
+        liveSocketRef.current.close();
+      } catch {}
+      liveSocketRef.current = null;
+    }
+
     setOperatingMode('LIVE');
     setLiveConnectionState('CONNECTING');
     setStatusBanner({
@@ -2234,6 +2304,7 @@ export default function App({
 
     try {
       const ws = new WebSocket(wsEndpoint);
+      liveSocketRef.current = ws;
       const timeout = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) {
           ws.close();
@@ -2272,18 +2343,23 @@ export default function App({
                 incomingSessions.forEach((s: any, idx: number) => {
                   const ip = s.current_ip || s.ip || s.initial_ip || '185.220.101.4';
                   const existing = map.get(ip);
+                  const stage = Number(s.highest_stage) || 0;
+                  const targets = ['hp-web'];
+                  if (stage >= 3) targets.push('hp-cowrie');
+                  if (stage >= 4) targets.push('hp-vault');
                   map.set(ip, {
                     id: s.id || existing?.id || `att-live-${ip.replace(/\./g, '-')}`,
                     ip,
                     nodeType: 'attacker',
                     asn: s.asn || existing?.asn || 'Adversary (Observed)',
-                    attackType: s.highest_stage >= 4 ? 'Cold Vault Exfil' : s.highest_stage >= 3 ? 'Jumpbox Shell Esc' : s.highest_stage >= 2 ? 'SQLi Injection' : 'Recon Probe',
+                    attackType: stage >= 4 ? 'Cold Vault Exfil' : stage >= 3 ? 'Jumpbox Shell Esc' : stage >= 2 ? 'SQLi Injection' : 'Recon Probe',
                     firstSeen: s.last_seen || existing?.firstSeen || 'Live Session',
                     lastSeen: 'Active',
+                    ts: Date.now(),
                     attempts: s.command_count || (existing ? existing.attempts + 1 : 1),
-                    targetedHoneypots: existing?.targetedHoneypots || ['honeypot-ssh-01'],
-                    protocols: existing?.protocols || ['TCP', 'SSH'],
-                    ports: existing?.ports || [8000, 22],
+                    targetedHoneypots: existing?.targetedHoneypots || targets,
+                    protocols: existing?.protocols || ['TCP', 'HTTP', 'SSH'],
+                    ports: existing?.ports || [22, 443],
                     severity: (s.threat_score >= 80 || s.severity === 'critical') ? 'critical' : 'high',
                     status: s.plausible_waf_drop ? 'Contained' : (s.status || 'Active'),
                     threatScore: s.threat_score || existing?.threatScore || 85,
@@ -2300,18 +2376,22 @@ export default function App({
             const attackerInfo = payload.attacker || {};
             const actionInfo = payload.action || {};
             const wazuh = payload.wazuh || {};
+            const stage = Number(payload.stage) || 0;
             const attackerIp = attackerInfo.ip || payload.ip || payload.source || '185.220.101.4';
-            const endpoint = actionInfo.endpoint || payload.stage_name || payload.destination || 'honeypot-ssh-01';
+            const endpoint = actionInfo.endpoint || payload.stage_name || payload.destination || '/';
+            const target = resolveStageHoneypot(stage, endpoint);
             const sev = (wazuh.level >= 13 || payload.severity === 'critical') ? 'critical' : 'high';
             const title = actionInfo.title || payload.intent_summary || payload.description || `Wazuh Rule ${wazuh.ruleId || payload.wazuh_rule || '100501'} Ingested`;
+            const protocol = stage === 3 ? 'SSH' : 'HTTP';
 
             appendEvent({
               id: payload.eventId || `evt-${Date.now()}`,
               severity: sev,
               source: attackerIp,
-              destination: endpoint,
-              protocol: payload.protocol || 'TCP',
-              type: payload.stage ? `STAGE_${payload.stage}_EXPLOIT` : (payload.type || 'SOC_TELEMETRY'),
+              destination: target.name,
+              resource: endpoint,
+              protocol,
+              type: stage ? `STAGE_${stage}_EXPLOIT` : (payload.type || 'SOC_TELEMETRY'),
               description: title,
               ja4h: attackerInfo.ja4h || payload.ja4h,
               hassh: payload.hassh,
@@ -2321,7 +2401,8 @@ export default function App({
               raw: msg.data,
             });
 
-            // Dynamically register / update attacker node on graph
+            // Attribute the frame to the decoy it actually hit so the topology
+            // draws attacker -> honeypot edges immediately.
             setAttackers((prev) => {
               const existing = prev.find((a) => a.ip === attackerIp);
               if (existing) {
@@ -2331,8 +2412,12 @@ export default function App({
                         ...a,
                         attempts: a.attempts + 1,
                         lastSeen: currentTime,
-                        targetedHoneypots: Array.from(new Set([...a.targetedHoneypots, endpoint])),
+                        ts: Date.now(),
+                        targetedHoneypots: Array.from(
+                          new Set([...(a.targetedHoneypots || []), target.id])
+                        ),
                         severity: sev,
+                        status: 'Active',
                         threatScore: Math.min(100, (a.threatScore || 70) + 5),
                       }
                     : a
@@ -2346,12 +2431,13 @@ export default function App({
                 attackType: title,
                 firstSeen: currentTime,
                 lastSeen: 'Active',
+                ts: Date.now(),
                 attempts: 1,
-                targetedHoneypots: [endpoint],
-                protocols: ['TCP'],
-                ports: [8000],
+                targetedHoneypots: [target.id],
+                protocols: ['TCP', protocol],
+                ports: stage === 3 ? [22] : [443],
                 severity: sev,
-                status: 'Malicious',
+                status: 'Active',
                 threatScore: payload.metrics?.threatScore || 85,
                 ja4h: attackerInfo.ja4h,
                 payloads: [actionInfo.rawPayload || title],
@@ -2359,6 +2445,36 @@ export default function App({
                 y: -140 + (Math.random() * 80 - 40),
               };
               return [newAttacker, ...prev];
+            });
+
+            // Live interaction counters on the decoy cards and inspector.
+            setHoneypots((prev) =>
+              prev.map((hp) =>
+                hp.id === target.id
+                  ? {
+                      ...hp,
+                      status: 'Under Attack',
+                      severity: sev,
+                      totalInteractions: (hp.totalInteractions || 0) + 1,
+                      activeSessions: Math.max(hp.activeSessions || 0, 1),
+                      lastActivity: 'Capturing adversary traffic',
+                    }
+                  : hp
+              )
+            );
+
+            // Keep the 1H volume chart moving between snapshot refreshes.
+            setAnalyticsSeries((prev) => {
+              const current = prev?.['1H'];
+              if (!Array.isArray(current) || current.length === 0) return prev;
+              const next = current.slice();
+              const last = { ...next[next.length - 1] };
+              last.attacks = (last.attacks || 0) + 1;
+              if (sev === 'critical') {
+                last.critical = (last.critical || 0) + 1;
+              }
+              next[next.length - 1] = last;
+              return { ...prev, '1H': next };
             });
 
             setTotalAttacksCount((c) => c + 1);
@@ -2377,7 +2493,10 @@ export default function App({
               id: payload.id || `evt-${Date.now()}`,
               severity: payload.severity || 'high',
               source: payload.source || '0.0.0.0',
-              destination: payload.destination || 'honeypot-ssh-01',
+              destination: resolveStageHoneypot(
+                payload.stage,
+                payload.destination
+              ).name,
               protocol: payload.protocol || 'TCP',
               type: payload.type || 'LIVE_TELEMETRY',
               description: payload.description || 'Live socket frame received',
@@ -2398,17 +2517,46 @@ export default function App({
           text: `LIVE STREAM ERROR: WebSocket connection to ${wsEndpoint} failed.`,
         });
       };
+
+      ws.onclose = () => {
+        clearTimeout(timeout);
+        if (liveSocketRef.current === ws) liveSocketRef.current = null;
+        if (intentionalCloseRef.current) return;
+        setLiveConnectionState('DISCONNECTED');
+        setStatusBanner({
+          level: 'critical',
+          text: `LIVE STREAM LOST: reconnecting to ${wsEndpoint} in 3s...`,
+        });
+        clearTimeout(liveReconnectRef.current);
+        liveReconnectRef.current = setTimeout(() => {
+          initiateLiveConnection();
+        }, 3000);
+      };
     } catch (err) {
       setLiveConnectionState('ERROR');
+      clearTimeout(liveReconnectRef.current);
+      liveReconnectRef.current = setTimeout(() => {
+        initiateLiveConnection();
+      }, 3000);
     }
   }, [wsEndpoint, appendEvent]);
 
-  // Auto-connect to live stream on mount if in live mode
+  // Connect once on mount; onclose owns reconnection with a 3s backoff.
   useEffect(() => {
-    if (operatingMode === 'LIVE' && liveConnectionState === 'DISCONNECTED') {
-      initiateLiveConnection();
-    }
-  }, [operatingMode, liveConnectionState, initiateLiveConnection]);
+    initiateLiveConnection();
+    return () => {
+      intentionalCloseRef.current = true;
+      clearTimeout(liveReconnectRef.current);
+      if (liveSocketRef.current) {
+        liveSocketRef.current.onclose = null;
+        try {
+          liveSocketRef.current.close();
+        } catch {}
+        liveSocketRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Allow operator to test ingesting a raw JSON frame into the Live pipeline
   const injectTestLiveFrame = () => {
@@ -3647,7 +3795,7 @@ export default function App({
                 </div>
                 <div className="h-56 bg-[#0B0B0C] border border-[#27272A] p-2">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={ANALYTICS_SERIES[analyticsTimeRange]}>
+                    <AreaChart data={analyticsSeries[analyticsTimeRange]}>
                       <CartesianGrid stroke="#1E1E22" strokeDasharray="3 3" />
                       <XAxis
                         dataKey="time"
@@ -3693,7 +3841,7 @@ export default function App({
                 </div>
                 <div className="h-56 bg-[#0B0B0C] border border-[#27272A] p-2">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={ANALYTICS_SERIES[analyticsTimeRange]}>
+                    <BarChart data={analyticsSeries[analyticsTimeRange]}>
                       <CartesianGrid stroke="#1E1E22" vertical={false} />
                       <XAxis
                         dataKey="time"
@@ -3730,10 +3878,17 @@ export default function App({
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       layout="vertical"
-                      data={honeypots.map((h) => ({
-                        name: h.name.replace('honeypot-', ''),
-                        hits: h.totalInteractions,
-                      }))}
+                      data={
+                        analyticsHoneypots.length > 0
+                          ? analyticsHoneypots.map((h: any) => ({
+                              name: h.label,
+                              hits: h.value,
+                            }))
+                          : honeypots.map((h) => ({
+                              name: h.name,
+                              hits: h.totalInteractions,
+                            }))
+                      }
                     >
                       <XAxis
                         type="number"
@@ -3769,13 +3924,10 @@ export default function App({
                 <div className="h-52 bg-[#0B0B0C] border border-[#27272A] p-2">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={[
-                        { proto: 'SSH/22', count: 1840 },
-                        { proto: 'HTTPS/443', count: 2490 },
-                        { proto: 'Telnet/23', count: 1620 },
-                        { proto: 'RESP/6379', count: 894 },
-                        { proto: 'Modbus/502', count: 412 },
-                      ]}
+                      data={analyticsProtocols.map((p: any) => ({
+                        proto: p.label,
+                        count: p.value,
+                      }))}
                     >
                       <XAxis
                         dataKey="proto"
@@ -3808,12 +3960,10 @@ export default function App({
                 <div className="h-52 bg-[#0B0B0C] border border-[#27272A] p-2">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={[
-                        { level: 'INFO', count: 1240 },
-                        { level: 'MEDIUM', count: 1680 },
-                        { level: 'HIGH', count: 1190 },
-                        { level: 'CRITICAL', count: 680 },
-                      ]}
+                      data={analyticsSeverity.map((s: any) => ({
+                        level: String(s.label).toUpperCase(),
+                        count: s.value,
+                      }))}
                     >
                       <XAxis
                         dataKey="level"
