@@ -202,7 +202,13 @@ export function PyriteTelemetryProvider({
     fetchLiveState()
     connectWebSocket()
 
+    // Resilient fallback polling every 2.5s so live dashboard stays synced even if WebSocket drops
+    const interval = setInterval(() => {
+      fetchLiveState()
+    }, 2500)
+
     return () => {
+      clearInterval(interval)
       clearTimeout(reconnectTimeoutRef.current)
       if (socketRef.current) {
         socketRef.current.close()

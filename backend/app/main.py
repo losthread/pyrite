@@ -7,10 +7,12 @@ D3COY 1.0 — Problem Statement 04: Deception-Driven Threat Detection & Response
 import json
 import os
 import random
+import time
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 import uvicorn
@@ -72,7 +74,7 @@ async def lifespan(app: FastAPI):
 ================================================================================
           PYRITE // AUTONOMOUS ACTIVE DECEPTION GRID                    
       Problem Statement 04: Deception-Driven Threat Detection & Response       
-================================================================================
+===============================================================================
   * Server Status:       ONLINE (FastAPI & WebSockets on port 8000)            
   * Demo Mode:           {DEMO_MODE}                                          
   * Active Topology:     {topology["seed_id"]}
@@ -103,6 +105,12 @@ app.add_middleware(
 )
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+# Standard health endpoints
+@app.get("/health")
+@app.get("/api/health")
+async def health_check():
+    return {"status": "ok", "service": "pyrite-soc-engine", "version": "1.0.0"}
 
 # Mount trap stages, auth, incidents and dashboard routers.
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
@@ -144,7 +152,6 @@ async def soc_websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"[!] [SOC WS EXCEPTION] {e}")
         ws_manager.disconnect(websocket)
-
 
 
 # ==============================================================================
