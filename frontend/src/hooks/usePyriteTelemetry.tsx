@@ -262,23 +262,37 @@ export function PyriteTelemetryProvider({
       const nowIso = new Date().toISOString();
       const activeSessions = shadowWorlds || [];
 
-      // Map real sessions to Attackers list for /dashboard/attackers
-      const attackers: Attacker[] = activeSessions.map((s, idx) => {
+      // Group real sessions by IP into unique attacker profiles for /dashboard/attackers
+      const attackersByIp = new Map<string, Attacker>();
+      activeSessions.forEach((s) => {
         const ip = s.current_ip || s.initial_ip || "10.46.34.150";
         const hp = s.last_honeypot || (s.highest_stage === 2 ? "honeypot-postgres-05" : s.highest_stage === 3 ? "honeypot-ssh-01" : s.highest_stage === 4 ? "honeypot-vault-08" : "honeypot-http-02");
-        return {
-          id: `att-${ip.replace(/\./g, "-")}`,
-          ip,
-          firstSeen: s.last_seen || nowIso,
-          lastSeen: s.last_seen || nowIso,
-          attempts: s.command_count || 1,
-          honeypots: [hp],
-          protocols: ["tcp", hp.includes("ssh") ? "ssh" : "http"],
-          severity: (s.threat_score >= 80 || s.highest_stage >= 3) ? "critical" : "suspicious",
-          status: s.plausible_waf_drop ? "contained" : "active",
-          ja4h: s.ja4h,
-        };
+        const canonicalId = `att-${ip.replace(/\./g, "-")}`;
+
+        if (!attackersByIp.has(ip)) {
+          attackersByIp.set(ip, {
+            id: canonicalId,
+            ip,
+            firstSeen: s.last_seen || nowIso,
+            lastSeen: s.last_seen || nowIso,
+            attempts: s.command_count || 1,
+            honeypots: [hp],
+            protocols: ["tcp", hp.includes("ssh") ? "ssh" : "http"],
+            severity: (s.threat_score >= 80 || s.highest_stage >= 3) ? "critical" : "suspicious",
+            status: s.plausible_waf_drop ? "contained" : "active",
+            ja4h: s.ja4h,
+          });
+        } else {
+          const existing = attackersByIp.get(ip)!;
+          existing.attempts += (s.command_count || 1);
+          if (!existing.honeypots.includes(hp)) {
+            existing.honeypots.push(hp);
+          }
+          if (s.plausible_waf_drop) existing.status = "contained";
+          if (s.threat_score >= 80 || s.highest_stage >= 3) existing.severity = "critical";
+        }
       });
+      const attackers: Attacker[] = Array.from(attackersByIp.values());
 
       // Map Honeypots list with dynamic under_attack state for /dashboard/honeypots
       const honeypots: Honeypot[] = HONEYPOT_DECOYS.map((hp) => {

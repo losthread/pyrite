@@ -170,9 +170,9 @@ export default function AttackersPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((attacker) => (
+              {filtered.map((attacker, idx) => (
                 <tr
-                  key={attacker.id}
+                  key={`${attacker.id}-${idx}`}
                   tabIndex={0}
                   onClick={() => setSelectedId(attacker.id)}
                   onKeyDown={(event) => {
