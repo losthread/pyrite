@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
 
     print(f"""
 ================================================================================
-          PYRITE (FeS2) // FOOL'S GOLD ACTIVE DECEPTION GRID                    
+          PYRITE // AUTONOMOUS ACTIVE DECEPTION GRID                    
       Problem Statement 04: Deception-Driven Threat Detection & Response       
 ================================================================================
   * Server Status:       ONLINE (FastAPI & WebSockets on port 8000)            
@@ -87,7 +87,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="PYRITE (FeS2) Active Deception Engine",
+    title="PYRITE Autonomous Deception Engine",
     description="Ephemeral, Polymorphic 4-Stage Honeypot & Wazuh Segregation Platform",
     version="1.0.0",
     lifespan=lifespan,

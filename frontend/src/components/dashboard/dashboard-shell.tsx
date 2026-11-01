@@ -72,7 +72,7 @@ function formatClock(date: Date) {
 function Mark() {
   return (
     <div className="grid size-7 place-items-center bg-signal text-black font-extrabold text-[12px] font-mono border border-signal">
-      Fe
+      P
     </div>
   )
 }
@@ -161,7 +161,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   PYRITE
                 </span>
                 <span className="mt-1 block font-mono text-[8px] tracking-[0.16em] text-[#F59E0B] uppercase font-semibold">
-                  FeS₂ // FOOL'S GOLD GRID
+                  AUTONOMOUS DECEPTION GRID
                 </span>
               </span>
             ) : null}

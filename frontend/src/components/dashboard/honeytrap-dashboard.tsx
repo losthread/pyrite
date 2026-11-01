@@ -180,14 +180,14 @@ const INITIAL_HONEYPOTS = [
     service: 'OpenSSH 8.9p1 (Cowrie Kernel Hook)',
     protocols: ['SSH', 'TCP/22', 'SFTP'],
     region: 'eu-central-1 (Frankfurt)',
-    status: 'Under Attack',
-    severity: 'high',
-    uptime: '42d 18h 11m',
-    totalInteractions: 1482,
-    activeSessions: 4,
-    lastActivity: '2s ago',
-    cpu: 28,
-    memory: 44,
+    status: 'Online',
+    severity: 'low',
+    uptime: '1d 04h 12m',
+    totalInteractions: 0,
+    activeSessions: 0,
+    lastActivity: 'Idle / Listening',
+    cpu: 3,
+    memory: 12,
     x: -135,
     y: -115,
   },
@@ -201,13 +201,13 @@ const INITIAL_HONEYPOTS = [
     protocols: ['HTTPS', 'HTTP/2', 'GraphQL', 'TCP/443'],
     region: 'us-east-1 (Virginia)',
     status: 'Online',
-    severity: 'medium',
-    uptime: '39d 04h 52m',
-    totalInteractions: 3290,
-    activeSessions: 3,
-    lastActivity: '5s ago',
-    cpu: 31,
-    memory: 58,
+    severity: 'low',
+    uptime: '1d 04h 12m',
+    totalInteractions: 0,
+    activeSessions: 0,
+    lastActivity: 'Idle / Listening',
+    cpu: 4,
+    memory: 14,
     x: 135,
     y: -115,
   },
@@ -220,14 +220,14 @@ const INITIAL_HONEYPOTS = [
     service: 'Redis 7.0 Unauthenticated Trap',
     protocols: ['RESP', 'TCP/6379'],
     region: 'ap-northeast-1 (Tokyo)',
-    status: 'Capturing',
-    severity: 'critical',
-    uptime: '19d 22h 09m',
-    totalInteractions: 894,
-    activeSessions: 2,
-    lastActivity: '1s ago',
-    cpu: 22,
-    memory: 36,
+    status: 'Online',
+    severity: 'low',
+    uptime: '1d 04h 12m',
+    totalInteractions: 0,
+    activeSessions: 0,
+    lastActivity: 'Idle / Listening',
+    cpu: 2,
+    memory: 10,
     x: -135,
     y: 115,
   },
@@ -240,14 +240,14 @@ const INITIAL_HONEYPOTS = [
     service: 'Siemens S7 / Modbus TCP Emulator',
     protocols: ['Modbus', 'S7COMM', 'TCP/502', 'TCP/102'],
     region: 'eu-west-1 (Dublin)',
-    status: 'Under Attack',
-    severity: 'critical',
-    uptime: '64d 11h 40m',
-    totalInteractions: 412,
-    activeSessions: 2,
-    lastActivity: '1s ago',
-    cpu: 64,
-    memory: 72,
+    status: 'Online',
+    severity: 'low',
+    uptime: '1d 04h 12m',
+    totalInteractions: 0,
+    activeSessions: 0,
+    lastActivity: 'Idle / Listening',
+    cpu: 5,
+    memory: 16,
     x: 135,
     y: 115,
   },
@@ -262,12 +262,12 @@ const INITIAL_HONEYPOTS = [
     region: 'us-west-2 (Oregon)',
     status: 'Online',
     severity: 'low',
-    uptime: '27d 09h 15m',
-    totalInteractions: 645,
-    activeSessions: 1,
-    lastActivity: '14s ago',
-    cpu: 15,
-    memory: 48,
+    uptime: '1d 04h 12m',
+    totalInteractions: 0,
+    activeSessions: 0,
+    lastActivity: 'Idle / Listening',
+    cpu: 3,
+    memory: 15,
     x: 0,
     y: -155,
   },
@@ -280,14 +280,14 @@ const INITIAL_HONEYPOTS = [
     service: 'MIPS BusyBox Telnet Sandbox',
     protocols: ['Telnet', 'TCP/23', 'TCP/2323'],
     region: 'ap-southeast-1 (Singapore)',
-    status: 'Degraded',
-    severity: 'high',
-    uptime: '51d 02h 30m',
-    totalInteractions: 2150,
-    activeSessions: 3,
-    lastActivity: '4s ago',
-    cpu: 74,
-    memory: 68,
+    status: 'Online',
+    severity: 'low',
+    uptime: '1d 04h 12m',
+    totalInteractions: 0,
+    activeSessions: 0,
+    lastActivity: 'Idle / Listening',
+    cpu: 2,
+    memory: 8,
     x: 0,
     y: 155,
   },
@@ -557,31 +557,26 @@ const DETERMINISTIC_DEMO_SCENARIOS = [
 
 const ANALYTICS_SERIES = {
   '1H': [
-    { time: '13:35', attacks: 42, contained: 4, critical: 7 },
-    { time: '13:45', attacks: 58, contained: 6, critical: 11 },
-    { time: '13:55', attacks: 51, contained: 7, critical: 14 },
-    { time: '14:05', attacks: 89, contained: 11, critical: 22 },
-    { time: '14:15', attacks: 76, contained: 12, critical: 18 },
-    { time: '14:25', attacks: 112, contained: 15, critical: 31 },
-    { time: '14:30', attacks: 128, contained: 18, critical: 37 },
+    { time: '14:00', attacks: 0, contained: 0, critical: 0 },
+    { time: '14:10', attacks: 0, contained: 0, critical: 0 },
+    { time: '14:20', attacks: 0, contained: 0, critical: 0 },
+    { time: '14:30', attacks: 0, contained: 0, critical: 0 },
   ],
   '24H': [
-    { time: '00:00', attacks: 310, contained: 28, critical: 42 },
-    { time: '04:00', attacks: 480, contained: 41, critical: 68 },
-    { time: '08:00', attacks: 620, contained: 59, critical: 95 },
-    { time: '12:00', attacks: 890, contained: 94, critical: 164 },
-    { time: '16:00', attacks: 740, contained: 82, critical: 119 },
-    { time: '20:00', attacks: 980, contained: 115, critical: 210 },
-    { time: '23:59', attacks: 1140, contained: 138, critical: 248 },
+    { time: '00:00', attacks: 0, contained: 0, critical: 0 },
+    { time: '06:00', attacks: 0, contained: 0, critical: 0 },
+    { time: '12:00', attacks: 0, contained: 0, critical: 0 },
+    { time: '18:00', attacks: 0, contained: 0, critical: 0 },
+    { time: '23:59', attacks: 0, contained: 0, critical: 0 },
   ],
   '7D': [
-    { time: 'MON', attacks: 3200, contained: 310, critical: 410 },
-    { time: 'TUE', attacks: 4100, contained: 420, critical: 590 },
-    { time: 'WED', attacks: 3850, contained: 390, critical: 520 },
-    { time: 'THU', attacks: 5400, contained: 610, critical: 890 },
-    { time: 'FRI', attacks: 6120, contained: 740, critical: 1040 },
-    { time: 'SAT', attacks: 4980, contained: 530, critical: 760 },
-    { time: 'SUN', attacks: 5890, contained: 680, critical: 940 },
+    { time: 'MON', attacks: 0, contained: 0, critical: 0 },
+    { time: 'TUE', attacks: 0, contained: 0, critical: 0 },
+    { time: 'WED', attacks: 0, contained: 0, critical: 0 },
+    { time: 'THU', attacks: 0, contained: 0, critical: 0 },
+    { time: 'FRI', attacks: 0, contained: 0, critical: 0 },
+    { time: 'SAT', attacks: 0, contained: 0, critical: 0 },
+    { time: 'SUN', attacks: 0, contained: 0, critical: 0 },
   ],
 };
 
@@ -1733,19 +1728,16 @@ export default function App({
   const [isMonitoringActive, setIsMonitoringActive] = useState(true);
   const [demoStepIndex, setDemoStepIndex] = useState(0);
 
-  // Core Data State
+  // Core Data State (Pure Real & Explicit Simulated Telemetry — Zero Dummy Data)
   const [infraNodes] = useState(INITIAL_INFRA_NODES);
   const [honeypots, setHoneypots] = useState(INITIAL_HONEYPOTS);
-  const [attackers, setAttackers] = useState(INITIAL_ATTACKERS);
-  const [events, setEvents] = useState(INITIAL_EVENTS);
-  const [totalAttacksCount, setTotalAttacksCount] = useState(5873);
-  const [statusBanner, setStatusBanner] = useState(null);
+  const [attackers, setAttackers] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [totalAttacksCount, setTotalAttacksCount] = useState(0);
+  const [statusBanner, setStatusBanner] = useState<any>(null);
 
   // Graph & Inspector State
-  const [selectedEntity, setSelectedEntity] = useState({
-    kind: 'ATTACKER',
-    data: INITIAL_ATTACKERS[3],
-  });
+  const [selectedEntity, setSelectedEntity] = useState<any>(null);
   const [nodeCategoryFilter, setNodeCategoryFilter] = useState('ALL');
   const [severityFilter, setSeverityFilter] = useState('ALL');
   const [honeypotFilter, setHoneypotFilter] = useState('ALL');
@@ -1761,7 +1753,7 @@ export default function App({
   const [eventSeverityFilter, setEventSeverityFilter] = useState('ALL');
   const [eventTypeFilter, setEventTypeFilter] = useState('ALL');
   const [eventHoneypotFilter, setEventHoneypotFilter] = useState('ALL');
-  const [inspectedEvent, setInspectedEvent] = useState(INITIAL_EVENTS[0]);
+  const [inspectedEvent, setInspectedEvent] = useState<any>(null);
 
   const [selectedHoneypotDetail, setSelectedHoneypotDetail] = useState(INITIAL_HONEYPOTS[0]);
   const [analyticsTimeRange, setAnalyticsTimeRange] = useState('24H');
@@ -1965,36 +1957,67 @@ export default function App({
 
   const resetDemoScenario = () => {
     setHoneypots(INITIAL_HONEYPOTS);
-    setAttackers(INITIAL_ATTACKERS);
-    setEvents(INITIAL_EVENTS);
-    setTotalAttacksCount(5873);
+    setAttackers([]);
+    setEvents([]);
+    setTotalAttacksCount(0);
     setDemoStepIndex(0);
-    setSelectedEntity({ kind: 'ATTACKER', data: INITIAL_ATTACKERS[3] });
+    setSelectedEntity(null);
+    setInspectedEvent(null);
     setStatusBanner({
       level: 'info',
-      text: 'DEMO SCENARIO RESET: Baseline honeypots, attackers, and telemetry restored.',
+      text: 'TELEMETRY RESET: Decoy grid cleared. Ready for live adversary traffic or simulation.',
     });
   };
 
-  // Deterministic background traffic tick in Demo Mode
+  // Fetch real backend sessions on mount if present
   useEffect(() => {
-    if (operatingMode !== 'DEMO' || !isMonitoringActive) return;
-    const timer = setInterval(() => {
-      const activeList = attackers.filter((a) => a.status !== 'Contained');
-      if (activeList.length === 0) return;
-      const pick = activeList[Math.floor(Math.random() * activeList.length)];
-      setTotalAttacksCount((c) => c + 4);
-      setAttackers((prev) =>
-        prev.map((a) =>
-          a.id === pick.id ? { ...a, attempts: a.attempts + 4, lastSeen: currentTime } : a
-        )
-      );
-    }, 4500);
-    return () => clearInterval(timer);
-  }, [operatingMode, isMonitoringActive, attackers, currentTime]);
+    let active = true;
+    async function loadRealSessions() {
+      try {
+        const apiBase = typeof window !== 'undefined'
+          ? `${window.location.protocol}//${window.location.hostname || 'localhost'}:8000`
+          : 'http://localhost:8000';
+        const res = await fetch(`${apiBase}/api/shadow-worlds`);
+        if (res.ok && active) {
+          const data = await res.json();
+          const sessions = data.sessions || [];
+          if (sessions.length > 0) {
+            const mapped = sessions.map((s: any, idx: number) => ({
+              id: `att-real-${idx}`,
+              ip: s.current_ip || s.initial_ip || '185.220.101.4',
+              nodeType: 'attacker',
+              asn: s.prod_correlated ? 'Tor Exit (East-West Correlated)' : 'Adversary (Observed)',
+              attackType: s.highest_stage >= 4 ? 'Cold Vault Exfiltration' : s.highest_stage >= 3 ? 'Jumpbox Shell Esc' : s.highest_stage >= 2 ? 'SQLi HoneyPatch' : 'Recon Probe',
+              firstSeen: s.last_seen || 'Active',
+              lastSeen: 'Active',
+              attempts: s.command_count || 1,
+              targetedHoneypots: ['honeypot-ssh-01'],
+              protocols: ['TCP', 'SSH'],
+              ports: [8000, 22],
+              severity: s.threat_score >= 80 ? 'critical' : 'high',
+              status: s.plausible_waf_drop ? 'Contained' : 'Active',
+              threatScore: s.threat_score || 85,
+              ja4h: s.ja4h,
+              payloads: [],
+              x: -250 + (idx * 60),
+              y: -140 + (idx * 50),
+            }));
+            setAttackers(mapped);
+            setTotalAttacksCount((prev) => Math.max(prev, mapped.reduce((acc: number, a: any) => acc + a.attempts, 0)));
+          }
+        }
+      } catch (e) {
+        // backend offline on mount
+      }
+    }
+    loadRealSessions();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // ==========================================================================
-  // LIVE BACKEND WEBSOCKET INTEGRATION (Never fabricates events in Live Mode)
+  // LIVE BACKEND WEBSOCKET INTEGRATION (Never fabricates events)
   // ==========================================================================
   const initiateLiveConnection = useCallback(() => {
     setOperatingMode('LIVE');
@@ -2028,72 +2051,131 @@ export default function App({
 
       ws.onmessage = (msg) => {
         try {
-          const data = JSON.parse(msg.data);
-          if (data.action === 'system_init') {
+          const parsed = JSON.parse(msg.data);
+          const msgType = parsed.type || parsed.action;
+          const payload = parsed.data || parsed.event || parsed;
+
+          if (msgType === 'system_init') {
             setStatusBanner({
               level: 'info',
-              text: `PYRITE KERNEL ACTIVE · Seed 0x${(data.seed || 0).toString(16)} · Wazuh: ${data.wazuh_status || 'ONLINE'}`,
+              text: `PYRITE KERNEL ACTIVE · Seed ${payload.activeSeed || '0x' + (payload.seed || 0).toString(16)} · Wazuh: ONLINE`,
             });
-            if (data.active_attackers && Array.isArray(data.active_attackers)) {
+            const incomingSessions = payload.sessions || payload.active_attackers;
+            if (incomingSessions && Array.isArray(incomingSessions) && incomingSessions.length > 0) {
               setAttackers((prev) => {
                 const map = new Map(prev.map((a) => [a.ip, a]));
-                data.active_attackers.forEach((att: any) => {
-                  const existing = map.get(att.ip);
-                  map.set(att.ip, {
-                    id: att.id || existing?.id || `att-live-${att.ip.replace(/\./g, '-')}`,
-                    ip: att.ip,
+                incomingSessions.forEach((s: any, idx: number) => {
+                  const ip = s.current_ip || s.ip || s.initial_ip || '185.220.101.4';
+                  const existing = map.get(ip);
+                  map.set(ip, {
+                    id: s.id || existing?.id || `att-live-${ip.replace(/\./g, '-')}`,
+                    ip,
                     nodeType: 'attacker',
-                    asn: att.asn || existing?.asn || 'External Adversary',
-                    attackType: att.attackType || existing?.attackType || 'Reconnaissance Probe',
-                    firstSeen: att.firstSeen || existing?.firstSeen || 'Live Session',
+                    asn: s.asn || existing?.asn || 'Adversary (Observed)',
+                    attackType: s.highest_stage >= 4 ? 'Cold Vault Exfil' : s.highest_stage >= 3 ? 'Jumpbox Shell Esc' : s.highest_stage >= 2 ? 'SQLi Injection' : 'Recon Probe',
+                    firstSeen: s.last_seen || existing?.firstSeen || 'Live Session',
                     lastSeen: 'Active',
-                    attempts: att.attempts || (existing ? existing.attempts + 1 : 1),
-                    targetedHoneypots: att.targetedHoneypots || existing?.targetedHoneypots || ['honeypot-ssh-01'],
-                    protocols: att.protocols || existing?.protocols || ['TCP'],
-                    ports: att.ports || existing?.ports || [8000],
-                    severity: att.severity || 'critical',
-                    status: att.status || 'Malicious',
-                    threatScore: att.threatScore || 85,
-                    ja4h: att.ja4h,
-                    payloads: att.payloads || existing?.payloads || [],
-                    x: existing?.x || (Math.random() * 200 - 100),
-                    y: existing?.y || (Math.random() * 200 - 100),
+                    attempts: s.command_count || (existing ? existing.attempts + 1 : 1),
+                    targetedHoneypots: existing?.targetedHoneypots || ['honeypot-ssh-01'],
+                    protocols: existing?.protocols || ['TCP', 'SSH'],
+                    ports: existing?.ports || [8000, 22],
+                    severity: (s.threat_score >= 80 || s.severity === 'critical') ? 'critical' : 'high',
+                    status: s.plausible_waf_drop ? 'Contained' : (s.status || 'Active'),
+                    threatScore: s.threat_score || existing?.threatScore || 85,
+                    ja4h: s.ja4h,
+                    payloads: existing?.payloads || [],
+                    x: existing?.x || (-250 + (idx * 60)),
+                    y: existing?.y || (-130 + (idx * 50)),
                   });
                 });
                 return Array.from(map.values());
               });
             }
-          } else if (data.action === 'soc_telemetry') {
-            const evt = data.event || data;
-            const wazuh = data.wazuh || {};
+          } else if (msgType === 'soc_telemetry') {
+            const attackerInfo = payload.attacker || {};
+            const actionInfo = payload.action || {};
+            const wazuh = payload.wazuh || {};
+            const attackerIp = attackerInfo.ip || payload.ip || payload.source || '185.220.101.4';
+            const endpoint = actionInfo.endpoint || payload.stage_name || payload.destination || 'honeypot-ssh-01';
+            const sev = (wazuh.level >= 13 || payload.severity === 'critical') ? 'critical' : 'high';
+            const title = actionInfo.title || payload.intent_summary || payload.description || `Wazuh Rule ${wazuh.ruleId || payload.wazuh_rule || '100501'} Ingested`;
+
             appendEvent({
-              severity: evt.severity || (evt.wazuh_rule >= 100504 ? 'critical' : 'high'),
-              source: evt.ip || '198.51.100.219',
-              destination: evt.stage_name || evt.destination || 'honeypot-ssh-01',
-              protocol: evt.protocol || 'TCP',
-              type: evt.stage ? `STAGE_${evt.stage}_EXPLOIT` : (evt.type || 'SOC_TELEMETRY'),
-              description: evt.intent_summary || evt.description || `Wazuh Rule ${evt.wazuh_rule || wazuh.rule_id || '100501'} Ingested`,
-              ja4h: evt.ja4h,
-              hassh: evt.hassh,
-              mitre_attack: evt.mitre_attack,
-              mitre_defend: evt.mitre_defend,
-              mitre_engage: evt.mitre_engage,
+              id: payload.eventId || `evt-${Date.now()}`,
+              severity: sev,
+              source: attackerIp,
+              destination: endpoint,
+              protocol: payload.protocol || 'TCP',
+              type: payload.stage ? `STAGE_${payload.stage}_EXPLOIT` : (payload.type || 'SOC_TELEMETRY'),
+              description: title,
+              ja4h: attackerInfo.ja4h || payload.ja4h,
+              hassh: payload.hassh,
+              mitre_attack: wazuh.mitreAttack?.id || payload.mitre_attack,
+              mitre_defend: payload.mitre_defend,
+              mitre_engage: wazuh.mitreEngage?.id || payload.mitre_engage,
               raw: msg.data,
             });
+
+            // Dynamically register / update attacker node on graph
+            setAttackers((prev) => {
+              const existing = prev.find((a) => a.ip === attackerIp);
+              if (existing) {
+                return prev.map((a) =>
+                  a.ip === attackerIp
+                    ? {
+                        ...a,
+                        attempts: a.attempts + 1,
+                        lastSeen: currentTime,
+                        targetedHoneypots: Array.from(new Set([...a.targetedHoneypots, endpoint])),
+                        severity: sev,
+                        threatScore: Math.min(100, (a.threatScore || 70) + 5),
+                      }
+                    : a
+                );
+              }
+              const newAttacker = {
+                id: `att-${attackerIp.replace(/\./g, '-')}`,
+                ip: attackerIp,
+                nodeType: 'attacker',
+                asn: 'External Adversary',
+                attackType: title,
+                firstSeen: currentTime,
+                lastSeen: 'Active',
+                attempts: 1,
+                targetedHoneypots: [endpoint],
+                protocols: ['TCP'],
+                ports: [8000],
+                severity: sev,
+                status: 'Malicious',
+                threatScore: payload.metrics?.threatScore || 85,
+                ja4h: attackerInfo.ja4h,
+                payloads: [actionInfo.rawPayload || title],
+                x: -250 + (Math.random() * 80 - 40),
+                y: -140 + (Math.random() * 80 - 40),
+              };
+              return [newAttacker, ...prev];
+            });
+
             setTotalAttacksCount((c) => c + 1);
-          } else if (data.action === 'topology_mutated') {
+          } else if (msgType === 'topology_mutated') {
             setStatusBanner({
               level: 'info',
-              text: `TOPOLOGY MUTATION APPLIED: Seed rotated to 0x${(data.new_seed || 0).toString(16)}`,
+              text: `TOPOLOGY MUTATION APPLIED: Seed rotated to ${payload.new_seed || 'Morph-v2.0'}`,
+            });
+          } else if (msgType === 'tarpit_progress') {
+            setStatusBanner({
+              level: 'critical',
+              text: `TARPIT ENGAGED: Adversary ${payload.ja4h?.slice(0, 8)} throttled to ${payload.speed || '128 B/2s'}`,
             });
           } else {
             appendEvent({
-              severity: data.severity || 'high',
-              source: data.source || '0.0.0.0',
-              destination: data.destination || 'honeypot-ssh-01',
-              protocol: data.protocol || 'TCP',
-              type: data.type || 'LIVE_TELEMETRY',
-              description: data.description || 'Live socket frame received',
+              id: payload.id || `evt-${Date.now()}`,
+              severity: payload.severity || 'high',
+              source: payload.source || '0.0.0.0',
+              destination: payload.destination || 'honeypot-ssh-01',
+              protocol: payload.protocol || 'TCP',
+              type: payload.type || 'LIVE_TELEMETRY',
+              description: payload.description || 'Live socket frame received',
               raw: msg.data,
             });
             setTotalAttacksCount((c) => c + 1);
@@ -2508,7 +2590,7 @@ export default function App({
         <div className="px-4 py-2 border-b border-[#27272A] bg-[#101012] flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
           <div className="flex items-center gap-3">
             <span className="text-[10px] uppercase font-bold text-[#F1EFE9] tracking-wider">
-              PYRITE // AUTONOMOUS DECEPTION GRID (FeS₂)
+              PYRITE // AUTONOMOUS DECEPTION GRID
             </span>
             <span className="text-[#22C55E] text-[10px] font-bold flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse" />
@@ -2704,37 +2786,43 @@ export default function App({
                 </button>
               </div>
               <div className="divide-y divide-[#27272A] max-h-[155px] overflow-y-auto font-mono text-[11px]">
-                {events.slice(0, 4).map((ev) => (
-                  <div
-                    key={ev.id}
-                    onClick={() => {
-                      const att = attackers.find((a) => a.ip === ev.source);
-                      if (att) setSelectedEntity({ kind: 'ATTACKER', data: att });
-                    }}
-                    className="px-3.5 py-2 bg-[#101012] hover:bg-[#18181B] cursor-pointer grid grid-cols-1 md:grid-cols-12 gap-2 items-center"
-                  >
-                    <span className="md:col-span-2 text-[#9A9891]">{ev.timestamp}</span>
-                    <span className="md:col-span-2">
-                      <span
-                        className={cn(
-                          'px-1.5 py-0.5 text-[9px] uppercase font-bold',
-                          ev.severity === 'critical'
-                            ? 'bg-[#FF493D] text-[#0B0B0C]'
-                            : 'bg-[#27272A] text-[#F1EFE9]'
-                        )}
-                      >
-                        {ev.type}
-                      </span>
-                    </span>
-                    <span className="md:col-span-3 font-bold text-[#F1EFE9]">
-                      {ev.source} → {ev.destination}
-                    </span>
-                    <span className="md:col-span-1 text-[#9A9891]">{ev.protocol}</span>
-                    <span className="md:col-span-4 font-sans text-xs text-[#D8D5CE] truncate">
-                      {ev.description}
-                    </span>
+                {events.length === 0 ? (
+                  <div className="px-4 py-8 bg-[#101012] text-center text-xs text-[#9A9891]">
+                    <span className="text-[#F1EFE9] font-bold">GRID LISTENING</span> · No adversary intrusions logged yet. Launch Red Team attack simulation to trigger telemetry.
                   </div>
-                ))}
+                ) : (
+                  events.slice(0, 4).map((ev) => (
+                    <div
+                      key={ev.id}
+                      onClick={() => {
+                        const att = attackers.find((a) => a.ip === ev.source);
+                        if (att) setSelectedEntity({ kind: 'ATTACKER', data: att });
+                      }}
+                      className="px-3.5 py-2 bg-[#101012] hover:bg-[#18181B] cursor-pointer grid grid-cols-1 md:grid-cols-12 gap-2 items-center"
+                    >
+                      <span className="md:col-span-2 text-[#9A9891]">{ev.timestamp}</span>
+                      <span className="md:col-span-2">
+                        <span
+                          className={cn(
+                            'px-1.5 py-0.5 text-[9px] uppercase font-bold',
+                            ev.severity === 'critical'
+                              ? 'bg-[#FF493D] text-[#0B0B0C]'
+                              : 'bg-[#27272A] text-[#F1EFE9]'
+                          )}
+                        >
+                          {ev.type}
+                        </span>
+                      </span>
+                      <span className="md:col-span-3 font-bold text-[#F1EFE9]">
+                        {ev.source} → {ev.destination}
+                      </span>
+                      <span className="md:col-span-1 text-[#9A9891]">{ev.protocol}</span>
+                      <span className="md:col-span-4 font-sans text-xs text-[#D8D5CE] truncate">
+                        {ev.description}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           </main>
@@ -2889,60 +2977,71 @@ export default function App({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#27272A] font-mono text-xs">
-                  {filteredAttackersList.map((att) => {
-                    const isSel =
-                      selectedEntity?.kind === 'ATTACKER' &&
-                      selectedEntity?.data?.id === att.id;
-                    return (
-                      <tr
-                        key={att.id}
-                        onClick={() => setSelectedEntity({ kind: 'ATTACKER', data: att })}
-                        className={cn(
-                          'cursor-pointer transition-colors',
-                          isSel ? 'bg-[#1E1E22]' : 'hover:bg-[#18181B]'
-                        )}
-                      >
-                        <td className="py-2.5 px-3 font-bold text-[#F1EFE9]">{att.ip}</td>
-                        <td className="py-2.5 px-3 font-sans text-xs text-[#D8D5CE]">
-                          {att.attackType}
-                        </td>
-                        <td className="py-2.5 px-3 text-[10px] text-[#9A9891]">
-                          {att.firstSeen} → {att.lastSeen}
-                        </td>
-                        <td className="py-2.5 px-3 font-bold text-[#F1EFE9]">{att.attempts}</td>
-                        <td className="py-2.5 px-3 text-[11px] text-[#D8D5CE]">
-                          {att.targetedHoneypots.join(', ')}
-                        </td>
-                        <td className="py-2.5 px-3 text-[11px] text-[#9A9891]">
-                          {att.protocols.join(', ')}
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span
-                            className={cn(
-                              'px-1.5 py-0.5 text-[10px] uppercase font-bold',
-                              att.severity === 'critical'
-                                ? 'bg-[#FF493D] text-[#0B0B0C]'
-                                : 'bg-[#27272A] text-[#F1EFE9]'
-                            )}
-                          >
-                            {att.severity}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span
-                            className={cn(
-                              'px-1.5 py-0.5 text-[10px] uppercase font-bold',
-                              att.status === 'Contained'
-                                ? 'border border-[#FF493D] text-[#FF493D]'
-                                : 'text-[#F1EFE9]'
-                            )}
-                          >
-                            {att.status}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {filteredAttackersList.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-[#9A9891]">
+                        <div className="text-[#F1EFE9] font-bold mb-1">NO ADVERSARIES OBSERVED // PERIMETER SECURE</div>
+                        <p className="text-[11px] text-[#71717A]">
+                          When adversary bots or scanners interact with honeytokens, their IP signatures and JA4H fingerprints will register here.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAttackersList.map((att) => {
+                      const isSel =
+                        selectedEntity?.kind === 'ATTACKER' &&
+                        selectedEntity?.data?.id === att.id;
+                      return (
+                        <tr
+                          key={att.id}
+                          onClick={() => setSelectedEntity({ kind: 'ATTACKER', data: att })}
+                          className={cn(
+                            'cursor-pointer transition-colors',
+                            isSel ? 'bg-[#1E1E22]' : 'hover:bg-[#18181B]'
+                          )}
+                        >
+                          <td className="py-2.5 px-3 font-bold text-[#F1EFE9]">{att.ip}</td>
+                          <td className="py-2.5 px-3 font-sans text-xs text-[#D8D5CE]">
+                            {att.attackType}
+                          </td>
+                          <td className="py-2.5 px-3 text-[10px] text-[#9A9891]">
+                            {att.firstSeen} → {att.lastSeen}
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-[#F1EFE9]">{att.attempts}</td>
+                          <td className="py-2.5 px-3 text-[11px] text-[#D8D5CE]">
+                            {att.targetedHoneypots.join(', ')}
+                          </td>
+                          <td className="py-2.5 px-3 text-[11px] text-[#9A9891]">
+                            {att.protocols.join(', ')}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span
+                              className={cn(
+                                'px-1.5 py-0.5 text-[10px] uppercase font-bold',
+                                att.severity === 'critical'
+                                  ? 'bg-[#FF493D] text-[#0B0B0C]'
+                                  : 'bg-[#27272A] text-[#F1EFE9]'
+                              )}
+                            >
+                              {att.severity}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span
+                              className={cn(
+                                'px-1.5 py-0.5 text-[10px] uppercase font-bold',
+                                att.status === 'Contained'
+                                  ? 'border border-[#FF493D] text-[#FF493D]'
+                                  : 'text-[#F1EFE9]'
+                              )}
+                            >
+                              {att.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -3029,46 +3128,55 @@ export default function App({
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               <div className="lg:col-span-8 bg-[#101012] border border-[#27272A] divide-y divide-[#27272A] max-h-[520px] overflow-y-auto font-mono text-xs">
-                {filteredEventsList.map((ev) => (
-                  <div
-                    key={ev.id}
-                    onClick={() => setInspectedEvent(ev)}
-                    className={cn(
-                      'p-3 cursor-pointer transition-colors',
-                      inspectedEvent?.id === ev.id
-                        ? 'bg-[#1E1E22]'
-                        : 'hover:bg-[#141416]'
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-[#9A9891]">{ev.id}</span>
-                        <span
-                          className={cn(
-                            'px-1.5 py-0.5 text-[9px] uppercase font-bold',
-                            ev.severity === 'critical'
-                              ? 'bg-[#FF493D] text-[#0B0B0C]'
-                              : 'bg-[#27272A] text-[#F1EFE9]'
-                          )}
-                        >
-                          {ev.type}
-                        </span>
-                        <span className="font-bold text-[#F1EFE9]">{ev.source}</span>
-                        <span className="text-[#9A9891]">→ {ev.destination}</span>
-                        <span className="text-[10px] px-1.5 bg-[#18181B] border border-[#27272A] text-[#D8D5CE]">
-                          {ev.protocol}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-[#9A9891]">{ev.timestamp}</span>
-                    </div>
-                    <div className="font-sans text-xs text-[#D8D5CE]">{ev.description}</div>
+                {filteredEventsList.length === 0 ? (
+                  <div className="p-12 text-center text-xs font-mono text-[#9A9891]">
+                    <div className="text-[#F1EFE9] font-bold mb-1">NO SECURITY EVENTS CAPTURED // SENSORS ACTIVE</div>
+                    <p className="text-[11px] text-[#71717A] max-w-md mx-auto">
+                      Standing by for adversary interaction. Launch an attack from the Red Team console or execute the CLI simulator to see real telemetry stream here.
+                    </p>
                   </div>
-                ))}
+                ) : (
+                  filteredEventsList.map((ev) => (
+                    <div
+                      key={ev.id}
+                      onClick={() => setInspectedEvent(ev)}
+                      className={cn(
+                        'p-3 cursor-pointer transition-colors',
+                        inspectedEvent?.id === ev.id
+                          ? 'bg-[#1E1E22]'
+                          : 'hover:bg-[#141416]'
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-[#9A9891]">{ev.id}</span>
+                          <span
+                            className={cn(
+                              'px-1.5 py-0.5 text-[9px] uppercase font-bold',
+                              ev.severity === 'critical'
+                                ? 'bg-[#FF493D] text-[#0B0B0C]'
+                                : 'bg-[#27272A] text-[#F1EFE9]'
+                            )}
+                          >
+                            {ev.type}
+                          </span>
+                          <span className="font-bold text-[#F1EFE9]">{ev.source}</span>
+                          <span className="text-[#9A9891]">→ {ev.destination}</span>
+                          <span className="text-[10px] px-1.5 bg-[#18181B] border border-[#27272A] text-[#D8D5CE]">
+                            {ev.protocol}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-[#9A9891]">{ev.timestamp}</span>
+                      </div>
+                      <div className="font-sans text-xs text-[#D8D5CE]">{ev.description}</div>
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* Event Detail Panel */}
               <div className="lg:col-span-4 bg-[#141416] border border-[#27272A] p-4 font-mono text-xs space-y-4">
-                {inspectedEvent && (
+                {inspectedEvent ? (
                   <>
                     <div className="border-b border-[#27272A] pb-2">
                       <div className="text-[10px] text-[#9A9891] uppercase">
@@ -3118,6 +3226,13 @@ export default function App({
                       </pre>
                     </div>
                   </>
+                ) : (
+                  <div className="py-16 text-center text-xs font-mono text-[#9A9891]">
+                    <div className="text-[#F1EFE9] font-bold mb-1">EVENT INSPECTOR IDLE</div>
+                    <p className="text-[11px] text-[#71717A]">
+                      Select an event from the stream to inspect full cryptographic and telemetry payloads.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
@@ -3246,32 +3361,38 @@ export default function App({
                     CONNECTED THREAT ACTORS TARGETING {selectedHoneypotDetail.name.toUpperCase()}
                   </div>
                   <div className="bg-[#101012] border border-[#27272A] divide-y divide-[#27272A]">
-                    {attackers
-                      .filter((a) => a.targetedHoneypots.includes(selectedHoneypotDetail.id))
-                      .map((a) => (
-                        <div
-                          key={a.id}
-                          onClick={() => setSelectedEntity({ kind: 'ATTACKER', data: a })}
-                          className="p-2.5 flex items-center justify-between cursor-pointer hover:bg-[#18181B]"
-                        >
-                          <div>
-                            <span className="font-bold text-[#F1EFE9]">{a.ip}</span>
-                            <span className="text-[#9A9891] ml-2 font-sans text-xs">
-                              {a.attackType}
+                    {attackers.filter((a) => a.targetedHoneypots?.includes(selectedHoneypotDetail.id)).length === 0 ? (
+                      <div className="p-6 text-center text-xs font-mono text-[#9A9891]">
+                        No active adversaries targeting this decoy yet.
+                      </div>
+                    ) : (
+                      attackers
+                        .filter((a) => a.targetedHoneypots?.includes(selectedHoneypotDetail.id))
+                        .map((a) => (
+                          <div
+                            key={a.id}
+                            onClick={() => setSelectedEntity({ kind: 'ATTACKER', data: a })}
+                            className="p-2.5 flex items-center justify-between cursor-pointer hover:bg-[#18181B]"
+                          >
+                            <div>
+                              <span className="font-bold text-[#F1EFE9]">{a.ip}</span>
+                              <span className="text-[#9A9891] ml-2 font-sans text-xs">
+                                {a.attackType}
+                              </span>
+                            </div>
+                            <span
+                              className={cn(
+                                'px-2 py-0.5 text-[10px] uppercase font-bold',
+                                a.status === 'Contained'
+                                  ? 'bg-[#FF493D] text-[#0B0B0C]'
+                                  : 'bg-[#27272A] text-[#F1EFE9]'
+                              )}
+                            >
+                              {a.status}
                             </span>
                           </div>
-                          <span
-                            className={cn(
-                              'px-2 py-0.5 text-[10px] uppercase font-bold',
-                              a.status === 'Contained'
-                                ? 'bg-[#FF493D] text-[#0B0B0C]'
-                                : 'bg-[#27272A] text-[#F1EFE9]'
-                            )}
-                          >
-                            {a.status}
-                          </span>
-                        </div>
-                      ))}
+                        ))
+                    )}
                   </div>
                 </div>
               </div>

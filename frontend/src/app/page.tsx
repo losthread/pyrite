@@ -12,15 +12,11 @@ export default function Page() {
   return (
     <div id="top" className="paper-grain flex min-h-svh flex-col bg-paper">
       <SiteHeader />
-      <SignalTicker />
       <main className="flex-1">
         <WordmarkMasthead />
         <PinnedScrollJourney />
         <TokenAnatomyCard />
         <LandingMiniTerminal />
-        <section className="border-b border-ink">
-          <BreachSimulator />
-        </section>
         <CommandCta />
       </main>
       <SiteFooter />

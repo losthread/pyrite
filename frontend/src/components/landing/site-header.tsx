@@ -6,12 +6,12 @@ import { navLinks } from "@/config/labyrinthConfig"
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-ink bg-paper/95 backdrop-blur-none">
-      <div className="flex h-6 items-center justify-between overflow-hidden border-b border-ink bg-signal px-3 text-signal-ink sm:px-5">
-        <span className="font-mono text-[9px] leading-none font-medium tracking-[0.13em] uppercase sm:text-[10px]">
-          <span className="mr-2 inline-block size-1.5 animate-blink bg-ink align-middle" />
-          Active deception grid online
+      <div className="flex h-6 items-center justify-between overflow-hidden border-b border-[#27272A] bg-[#101012] px-3 text-[#9A9891] sm:px-5">
+        <span className="font-mono text-[9px] leading-none font-semibold tracking-[0.13em] uppercase sm:text-[10px] text-[#22C55E] flex items-center">
+          <span className="mr-2 inline-block size-1.5 rounded-full bg-[#22C55E] animate-pulse" />
+          Active Deception Grid Online
         </span>
-        <span className="hidden items-center gap-5 font-mono text-[10px] leading-none tracking-[0.13em] uppercase sm:flex">
+        <span className="hidden items-center gap-5 font-mono text-[10px] leading-none tracking-[0.13em] uppercase sm:flex text-muted-ink">
           <span>AUX / SOC-01</span>
           <span>MORPH-v2.0</span>
           <span>REV 2.6</span>
@@ -24,15 +24,15 @@ export function SiteHeader() {
           className="group flex items-center gap-2.5 border-r border-ink px-3 sm:px-5"
           aria-label="PYRITE home"
         >
-          <span className="grid size-7 place-items-center bg-signal text-[11px] font-bold text-ink">
-            Fe
+          <span className="grid size-7 place-items-center bg-signal text-[12px] font-mono font-bold text-black border border-signal">
+            P
           </span>
           <span className="leading-none">
             <span className="block font-display text-[1.4rem] tracking-[-0.04em] uppercase text-ink">
               PYRITE
             </span>
             <span className="mt-1 block font-mono text-[8px] tracking-[0.14em] text-muted-ink uppercase">
-              FOOL'S GOLD // FeS₂
+              AUTONOMOUS DECEPTION GRID
             </span>
           </span>
         </Link>

@@ -305,7 +305,7 @@ export function RedTeamAttackConsole({
               LIVE RED-TEAM ATTACK CONSOLE
             </h2>
             <p className="font-mono text-[9px] tracking-widest text-[#F59E0B] uppercase">
-              PYRITE // FeS₂ Adversary Harness
+              PYRITE // AUTONOMOUS ADVERSARY HARNESS
             </p>
           </div>
         </div>

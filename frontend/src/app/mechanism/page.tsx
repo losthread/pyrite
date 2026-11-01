@@ -5,7 +5,7 @@ import { CommandCta } from "@/components/landing/command-cta"
 import { SubpageShell } from "@/components/landing/subpage-shell"
 
 export const metadata: Metadata = {
-  title: "Mechanism — PYRITE (FeS₂)",
+  title: "Mechanism — PYRITE // Autonomous Deception",
   description:
     "The four-stage polymorphic Pyrite Nugget labyrinth: recon leak, HoneyPatch database fork, shadow shell, and vault tarpit.",
 }

@@ -562,7 +562,7 @@ async def get_system_status():
     topology = get_active_topology()
     return {
         "status": "ONLINE",
-        "system": "PYRITE (FeS2) Fool's Gold Active Deception Grid",
+        "system": "PYRITE Autonomous Deception Grid",
         "version": "1.0.0",
         "activeSeed": topology["seed_id"],
         "persona": topology["persona"],

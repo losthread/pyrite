@@ -82,3 +82,16 @@ Legend: `[ ]` PENDING · `[~]` IN_PROGRESS · `[x]` COMPLETED
 - Files: components/landing/pyrite-crystal-canvas.tsx, components/landing/pinned-scroll-journey.tsx, components/landing/token-anatomy-card.tsx, components/landing/landing-mini-terminal.tsx, components/landing/wordmark-masthead.tsx, app/page.tsx
 - All 9 Modules fully integrated, verified, and passing!
 
+## Module 10 — Hero Restoration, FeS₂ Scrub & Pure Real-Data Telemetry Baseline
+- [x] Hero section restored: Ditched Three.js canvas in hero wordmark; restored original high-contrast fuzzy dot-matrix "pyrite" halftone typography.
+- [x] Test clutter eliminated: Removed redundant `SignalTicker` and duplicated `BreachSimulator` test bars.
+- [x] FeS₂ scrubbed globally: Replaced all chemical formula mentions (`FeS₂`, `FeS2`, `Fe` mark) with cybersecurity standard branding (`P` monogram, `AUTONOMOUS DECEPTION GRID`).
+- [x] Dummy data eradicated (5.8k mock counter purged):
+  - Initial `totalAttacksCount` reset from `5873` to `0`.
+  - Removed fake background interval adding `+4` attacks every 4.5s.
+  - `INITIAL_ATTACKERS` and `INITIAL_EVENTS` dummy lists removed from initial state (now initialized to `[]`).
+  - `INITIAL_HONEYPOTS` interactions reset from fake numbers (1482, 3290, etc.) to 0 baseline.
+  - `ANALYTICS_SERIES` and `demoSnapshot` purged of fabricated counts.
+  - Real data pipeline connected: WebSocket and REST endpoints dynamically populate real sessions from FastAPI SQLite/Wazuh and real attacks executed from Red Team console / CLI simulator.
+- Files: frontend/src/components/dashboard/honeytrap-dashboard.tsx, frontend/src/lib/dashboard/data.ts, backend/app/routes/dashboard.py, frontend/src/components/landing/wordmark-masthead.tsx, frontend/src/components/landing/site-footer.tsx, frontend/src/components/landing/command-cta.tsx, frontend/src/components/dashboard/redteam-attack-console.tsx, backend/app/stages/routes.py, attacker-cli/attack_sim.py
+

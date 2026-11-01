@@ -62,7 +62,7 @@ export default function AttackersPage() {
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-mono text-[9px] tracking-[0.14em] text-muted-ink uppercase">
-              PYRITE (FeS₂) // Attackers
+              PYRITE // Attackers
             </p>
             <StatusPill tone={mode === "demo" ? "critical" : connected ? "live" : "critical"}>
               {mode === "demo" ? "Simulated attackers" : connected ? "Live attackers" : "Disconnected"}

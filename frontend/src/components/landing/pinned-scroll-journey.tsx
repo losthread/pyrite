@@ -31,7 +31,7 @@ User-Agent: curl/7.88.1 (x86_64)
 
 HTTP/1.1 200 OK
 Content-Type: text/plain
-X-Deception-Engine: Pyrite/FeS2
+X-Deception-Engine: Pyrite/Autonomous-Deception
 
 000000 4a8b29c3 devops-admin <infra@aether-fintech.int> 1793496385 +0000
 commit: fix(auth): rotate staging secret vk_live_eyJzIjoxLCJm...`,
@@ -142,7 +142,7 @@ export function PinnedScrollJourney() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#27272A] pb-4 shrink-0">
         <div>
           <span className="font-mono text-[10px] uppercase tracking-widest text-[#F59E0B] font-bold">
-            FE-S₂ // AUTONOMOUS DECEPTION MECHANISM
+            PYRITE // AUTONOMOUS DECEPTION MECHANISM
           </span>
           <h2 className="text-xl sm:text-2xl lg:text-3xl font-display font-bold text-[#F1EFE9] tracking-tight">
             The 4-Stage Adversary Labyrinth

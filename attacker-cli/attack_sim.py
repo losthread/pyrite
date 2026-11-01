@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ==============================================================================
-VYUH (CHAKRAVYUH) // ACTIVE DECEPTION ATTACKER DEMO SIMULATOR
+PYRITE // AUTONOMOUS DECEPTION ATTACKER SIMULATOR
 D3COY 1.0 — Problem Statement 04: Deception-Driven Threat Detection & Response
 ==============================================================================
 Interactive Python CLI demo for live pitch presentations.
@@ -115,7 +115,7 @@ def render_header():
 
     print(f"""
 {CYAN}{BOLD}+------------------------------------------------------------------------------+
-|             PYRITE (FeS₂) // FOOL'S GOLD ACTIVE DECEPTION DEMO CLI            |
+|             PYRITE // AUTONOMOUS ACTIVE DECEPTION DEMO CLI                   |
 |      Problem Statement 04: Deception-Driven Threat Detection & Response      |
 +------------------------------------------------------------------------------+{RESET}
   {BOLD}Target Server:{RESET}       {YELLOW}{state['target_url']}{RESET}

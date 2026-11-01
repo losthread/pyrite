@@ -1,104 +1,72 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
 
+from ..core.intelligence import DB_PATH
+from ..core.shadow_world import get_all_shadow_worlds
+
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
-SAMPLE_PATH = Path(__file__).resolve().parent.parent / "data" / "wazuh_sample.json"
 
+def get_real_db_events() -> tuple[int, int, list[dict[str, Any]]]:
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM telemetry_events")
+        total_count = cursor.fetchone()[0]
 
-def load_sample() -> dict[str, Any]:
-    with SAMPLE_PATH.open("r", encoding="utf-8") as sample_file:
-        return json.load(sample_file)
+        cursor.execute("SELECT COUNT(*) FROM telemetry_events WHERE wazuh_level >= 13")
+        critical_count = cursor.fetchone()[0]
 
-
-def severity_for_level(level: int) -> str:
-    if level >= 13:
-        return "critical"
-    if level >= 8:
-        return "suspicious"
-    return "info"
+        cursor.execute("SELECT full_json FROM telemetry_events ORDER BY id DESC LIMIT 50")
+        rows = cursor.fetchall()
+        events = []
+        for r in rows:
+            try:
+                events.append(json.loads(r[0]))
+            except Exception:
+                pass
+        conn.close()
+        return total_count, critical_count, events
+    except Exception:
+        return 0, 0, []
 
 
 def build_snapshot() -> dict[str, Any]:
-    document = load_sample()
-    source = document["_source"]
-    rule = source["rule"]
-    data = source["data"]
-    source_ip = data["source_ip"]
-    honeypot = data["honeypot"]
-    destination = "cowrie-ssh"
-    destination_ip = "10.0.4.21"
-    level = rule["level"]
-    severity = severity_for_level(level)
-    attempts = data.get("attempt_count", rule.get("firedtimes", 1))
-    observed_at = source["timestamp"]
-    mitre = rule.get("mitre", {})
-    mitre_id = (mitre.get("id") or ["—"])[0]
-    mitre_tactic = (mitre.get("tactic") or ["—"])[0]
-    mitre_technique = (mitre.get("technique") or ["—"])[0]
+    now_iso = datetime.now(timezone.utc).isoformat()
+    total_db_events, critical_db_events, raw_events = get_real_db_events()
+    sessions = get_all_shadow_worlds()
 
-    event = {
-        "id": source["id"],
-        "timestamp": observed_at,
-        "severity": severity,
-        "sourceIp": source_ip,
-        "destination": destination,
-        "destinationIp": destination_ip,
-        "protocol": data["protocol"],
-        "eventType": data["event_type"],
-        "description": rule["description"],
-        "ruleId": str(rule["id"]),
-        "ruleLevel": level,
-        "mitreId": mitre_id,
-        "mitreTactic": mitre_tactic,
-        "mitreTechnique": mitre_technique,
-        "honeypot": honeypot,
-        "sessionId": data.get("session_id"),
-        "username": data.get("username"),
-        "raw": document,
-    }
+    total_attacks = max(total_db_events, sum(s.get("command_count", 1) for s in sessions))
+    active_attackers = len([s for s in sessions if not s.get("plausible_waf_drop")])
+    captured_sessions = len([s for s in sessions if s.get("plausible_waf_drop")])
+    critical_alerts = critical_db_events
 
+    # Decoy and Infrastructure Nodes (always present on grid)
     nodes = [
         {
-            "id": "attacker-live-01",
-            "label": source_ip,
-            "ip": source_ip,
-            "kind": "attacker",
-            "severity": severity,
-            "status": "Active",
-            "x": 120,
-            "y": 270,
-            "protocols": [data["protocol"]],
-            "connectionCount": 1,
-            "firstSeen": observed_at,
-            "lastSeen": observed_at,
-            "associatedHoneypot": destination,
-            "threatClassification": mitre_technique,
-        },
-        {
             "id": "hp-cowrie",
-            "label": destination,
-            "ip": destination_ip,
+            "label": "cowrie-ssh",
+            "ip": "10.0.4.21",
             "kind": "honeypot",
-            "severity": severity,
-            "status": "Under attack",
+            "severity": "info",
+            "status": "Online",
             "x": 500,
             "y": 270,
-            "protocols": [data["protocol"]],
-            "connectionCount": 2,
-            "firstSeen": observed_at,
-            "lastSeen": observed_at,
-            "associatedHoneypot": destination,
+            "protocols": ["ssh"],
+            "connectionCount": len(sessions),
+            "firstSeen": now_iso,
+            "lastSeen": now_iso,
+            "associatedHoneypot": "cowrie-ssh",
         },
         {
             "id": "wazuh",
-            "label": source["manager"]["name"],
+            "label": "wazuh-manager",
             "ip": "10.0.0.5",
             "kind": "infrastructure",
             "severity": "info",
@@ -106,87 +74,124 @@ def build_snapshot() -> dict[str, Any]:
             "x": 820,
             "y": 270,
             "protocols": ["tcp"],
-            "connectionCount": 1,
-            "firstSeen": observed_at,
-            "lastSeen": observed_at,
+            "connectionCount": 1 if total_attacks > 0 else 0,
+            "firstSeen": now_iso,
+            "lastSeen": now_iso,
         },
     ]
 
-    connections = [
-        {
-            "id": "e-live-01",
-            "source": "attacker-live-01",
+    connections = []
+    attackers = []
+    events = []
+
+    # Map real shadow world sessions if any exist
+    for idx, s in enumerate(sessions):
+        att_id = f"attacker-real-{idx+1}"
+        ip = s.get("current_ip") or s.get("initial_ip") or "185.220.101.4"
+        sev = "critical" if s.get("threat_score", 0) >= 80 else "suspicious"
+        nodes.append({
+            "id": att_id,
+            "label": ip,
+            "ip": ip,
+            "kind": "attacker",
+            "severity": sev,
+            "status": "Contained" if s.get("plausible_waf_drop") else "Active",
+            "x": 120,
+            "y": 270 + (idx * 90),
+            "protocols": ["tcp", "ssh"],
+            "connectionCount": s.get("command_count", 1),
+            "firstSeen": s.get("last_seen", now_iso),
+            "lastSeen": s.get("last_seen", now_iso),
+            "associatedHoneypot": "cowrie-ssh",
+            "threatClassification": "Adversary Session",
+        })
+        connections.append({
+            "id": f"e-real-{idx+1}",
+            "source": att_id,
             "target": "hp-cowrie",
-            "severity": severity,
-            "protocol": data["protocol"],
-            "packets": attempts,
-            "lastSeen": observed_at,
-            "label": rule["description"],
-        },
-        {
-            "id": "e-live-02",
-            "source": "hp-cowrie",
-            "target": "wazuh",
-            "severity": "info",
+            "severity": sev,
             "protocol": "tcp",
-            "packets": attempts,
-            "lastSeen": observed_at,
-            "label": "Wazuh alert transport",
-        },
-    ]
+            "packets": s.get("command_count", 1),
+            "lastSeen": s.get("last_seen", now_iso),
+            "label": "Observed Intrusion",
+        })
+        attackers.append({
+            "id": att_id,
+            "ip": ip,
+            "firstSeen": s.get("last_seen", now_iso),
+            "lastSeen": s.get("last_seen", now_iso),
+            "attempts": s.get("command_count", 1),
+            "honeypots": ["cowrie-ssh"],
+            "protocols": ["tcp", "ssh"],
+            "severity": sev,
+            "status": "contained" if s.get("plausible_waf_drop") else "active",
+            "ja4h": s.get("ja4h", "not-captured"),
+        })
+
+    # Map real persisted telemetry events if any exist
+    for raw in raw_events:
+        action = raw.get("action", {})
+        attacker = raw.get("attacker", {})
+        wazuh = raw.get("wazuh", {})
+        events.append({
+            "id": raw.get("eventId", f"evt-{len(events)}"),
+            "timestamp": raw.get("timestamp", now_iso),
+            "severity": "critical" if wazuh.get("level", 0) >= 13 else "high",
+            "sourceIp": attacker.get("ip", "185.220.101.4"),
+            "destination": action.get("endpoint", "cowrie-ssh"),
+            "destinationIp": "10.0.4.21",
+            "protocol": "TCP",
+            "eventType": action.get("title", "SOC_TELEMETRY"),
+            "description": wazuh.get("description", action.get("title", "Telemetry Event")),
+            "ruleId": str(wazuh.get("ruleId", "100501")),
+            "ruleLevel": wazuh.get("level", 10),
+            "mitreId": wazuh.get("mitreAttack", {}).get("id", "T1595"),
+            "mitreTactic": "Active Deception",
+            "mitreTechnique": wazuh.get("mitreAttack", {}).get("name", "Deception Controls"),
+            "honeypot": action.get("endpoint", "cowrie-ssh"),
+            "sessionId": attacker.get("ja4h"),
+            "raw": raw,
+        })
 
     return {
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
-        "source": "wazuh-live",
+        "generatedAt": now_iso,
+        "source": "pyrite-live",
         "metrics": {
-            "totalAttacks": attempts,
-            "activeAttackers": 1,
-            "capturedSessions": 0,
-            "criticalAlerts": 1 if severity == "critical" else 0,
+            "totalAttacks": total_attacks,
+            "activeAttackers": active_attackers,
+            "capturedSessions": captured_sessions,
+            "criticalAlerts": critical_alerts,
         },
         "nodes": nodes,
         "connections": connections,
-        "events": [event],
-        "attackers": [
-            {
-                "id": "attacker-live-01",
-                "ip": source_ip,
-                "firstSeen": observed_at,
-                "lastSeen": observed_at,
-                "attempts": attempts,
-                "honeypots": [destination],
-                "protocols": [data["protocol"]],
-                "severity": severity,
-                "status": "active",
-                "ja4h": "not-captured",
-            }
-        ],
+        "events": events,
+        "attackers": attackers,
         "honeypots": [
             {
                 "id": "hp-cowrie",
-                "name": destination,
+                "name": "cowrie-ssh",
                 "host": "cowrie-ssh.hp.internal",
-                "ip": destination_ip,
+                "ip": "10.0.4.21",
                 "type": "SSH",
-                "status": "under_attack",
-                "sessions": 0,
-                "interactions": attempts,
-                "lastActivity": observed_at,
-                "severity": severity,
-                "protocols": [data["protocol"]],
+                "status": "under_attack" if total_attacks > 0 else "online",
+                "sessions": active_attackers,
+                "interactions": total_attacks,
+                "lastActivity": now_iso,
+                "severity": "critical" if critical_alerts > 0 else "info",
+                "protocols": ["ssh"],
             }
         ],
         "alerts": [],
         "analytics": {
-            "volume": [{"label": observed_at[11:16], "value": attempts}],
+            "volume": [{"label": now_iso[11:16], "value": total_attacks}],
             "severity": [
-                {"label": "Critical", "value": 1 if severity == "critical" else 0},
-                {"label": "Suspicious", "value": 1 if severity == "suspicious" else 0},
-                {"label": "Informational", "value": 1 if severity == "info" else 0},
+                {"label": "Critical", "value": critical_alerts},
+                {"label": "Suspicious", "value": total_attacks - critical_alerts if total_attacks > critical_alerts else 0},
+                {"label": "Informational", "value": 0},
             ],
-            "targetedHoneypots": [{"label": destination, "value": attempts}],
-            "protocols": [{"label": data["protocol"], "value": 1}],
-            "sessions": [{"label": observed_at[11:16], "value": 0}],
+            "targetedHoneypots": [{"label": "cowrie-ssh", "value": total_attacks}],
+            "protocols": [{"label": "TCP", "value": total_attacks}],
+            "sessions": [{"label": now_iso[11:16], "value": active_attackers}],
         },
     }
 
